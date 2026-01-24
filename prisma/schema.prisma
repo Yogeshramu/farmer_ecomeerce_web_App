@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  FARMER
+  CONSUMER
+}
+
+enum OrderStatus {
+  PLACED
+  ACCEPTED
+  OUT_FOR_DELIVERY
+  DELIVERED
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  mobile    String?
+  role      Role
+  
+  // Location info
+  pincode   String?
+  address   String?
+  latitude  Float?
+  longitude Float?
+  
+  crops     Crop[]
+  farmerOrders    Order[] @relation("FarmerOrders")
+  consumerOrders  Order[] @relation("ConsumerOrders")
+  
+  answers         Answer[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Crop {
+  id            String   @id @default(uuid())
+  name          String
+  quantityKg    Float
+  basePrice     Float    // Price per Kg
+  farmerPincode String?
+  
+  farmerId      String
+  farmer        User     @relation(fields: [farmerId], references: [id])
+  
+  items         OrderItem[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model PincodeLocation {
+  id        String @id @default(uuid())
+  pincode   String @unique
+  latitude  Float
+  longitude Float
+}
+
+model Order {
+  id              String      @id @default(uuid())
+  consumerId      String
+  consumer        User        @relation("ConsumerOrders", fields: [consumerId], references: [id])
+  
+  farmerId        String
+  farmer          User        @relation("FarmerOrders", fields: [farmerId], references: [id])
+  
+  status          OrderStatus @default(PLACED)
+  
+  totalAmount     Float
+  deliveryCharge  Float
+  
+  deliveryTime    String?     // Morning / Afternoon / Evening
+  deliveryAddress String?
+  deliveryPincode String?
+  
+  items           OrderItem[]
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model OrderItem {
+  id        String @id @default(uuid())
+  orderId   String
+  order     Order  @relation(fields: [orderId], references: [id])
+  
+  cropId    String
+  crop      Crop   @relation(fields: [cropId], references: [id])
+  
+  quantity  Float
+  price     Float
+}
+
+model Question {
+  id        String   @id @default(uuid())
+  text      String
+  order     Int      @default(0) // To show in sequence
+  answers   Answer[]
+}
+
+model Answer {
+  id          String   @id @default(uuid())
+  transcript  String   // The text converted from audio
+  audioUrl    String?  // Path to saved audio file
+  
+  questionId  String
+  question    Question @relation(fields: [questionId], references: [id])
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
+}
