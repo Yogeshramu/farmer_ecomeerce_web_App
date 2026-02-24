@@ -14,7 +14,7 @@ export async function DELETE(
 
         const { id } = await params;
 
-        // Verify ownership - only the farmer who created it can delete
+        // Verify ownership
         const crop = await prisma.crop.findUnique({
             where: { id },
             select: { farmerId: true }
@@ -28,12 +28,26 @@ export async function DELETE(
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
-        // Delete the crop
-        await prisma.crop.delete({
-            where: { id }
-        });
+        // FORCE DELETE: Transaction to remove related items first
+        // This solves the "Foreign Key Constraint" error
+        try {
+            await prisma.$transaction([
+                // 1. Delete associated OrderItems
+                prisma.orderItem.deleteMany({
+                    where: { cropId: id }
+                }),
+                // 2. Delete the Crop itself
+                prisma.crop.delete({
+                    where: { id }
+                })
+            ]);
 
-        return NextResponse.json({ success: true, message: 'Crop deleted successfully' });
+            return NextResponse.json({ success: true, message: 'Crop and related history deleted successfully' });
+        } catch (dbError) {
+            console.error('Database cascade delete failed:', dbError);
+            return NextResponse.json({ error: 'Database error during delete' }, { status: 500 });
+        }
+
     } catch (error) {
         console.error('Delete crop error:', error);
         return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/app/components/ui/Button';
 import { ShoppingCart, MapPin, Clock, Package, Truck, CheckCircle } from 'lucide-react';
+import { fetchWithAuth } from '@/lib/clientAuth';
 
 interface Crop {
     id: string;
@@ -63,7 +64,7 @@ export default function ConsumerDashboard() {
 
     const fetchOrders = useCallback(async () => {
         try {
-            const res = await fetch('/api/orders');
+            const res = await fetchWithAuth('/api/orders');
             const data = await res.json();
             if (data.orders) setOrders(data.orders);
         } catch (error) {
@@ -100,7 +101,7 @@ export default function ConsumerDashboard() {
         setLoading(true);
         const items = cart.map(c => ({ cropId: c.id, quantity: c.cartQty }));
         try {
-            const res = await fetch('/api/orders', {
+            const res = await fetchWithAuth('/api/orders', {
                 method: 'POST',
                 body: JSON.stringify({
                     items,
@@ -110,14 +111,23 @@ export default function ConsumerDashboard() {
                 }),
                 headers: { 'Content-Type': 'application/json' }
             });
-            if (res.ok) {
-                alert('Order Place Successfully!');
-                setCart([]);
-                setView('orders');
-                fetchOrders();
-            } else {
-                alert('Failed to place order');
+            
+            if (!res.ok) {
+                const error = await res.json();
+                if (res.status === 401) {
+                    alert('Session expired. Please login again.');
+                    window.location.href = '/consumer/login';
+                    return;
+                }
+                alert(`Failed to place order: ${error.error || 'Unknown error'}`);
+                setLoading(false);
+                return;
             }
+            
+            alert('Order Place Successfully!');
+            setCart([]);
+            setView('orders');
+            fetchOrders();
         } catch (error) {
             console.error(error);
             alert('Error placing order');
@@ -139,6 +149,12 @@ export default function ConsumerDashboard() {
                         <ShoppingCart size={20} />
                         {cart.length > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">{cart.length}</span>}
                     </Button>
+                    <Button variant="outline" onClick={async () => {
+                        await fetch('/api/auth/logout', { method: 'POST' });
+                        window.location.href = '/';
+                    }} className="text-red-600 hover:text-red-700">
+                        Logout
+                    </Button>
                 </div>
             </header>
 
@@ -146,7 +162,7 @@ export default function ConsumerDashboard() {
                 {view === 'market' && (
                     <div className="space-y-6 animate-in fade-in">
                         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {crops.map(crop => (
+                            {crops.filter(crop => crop.quantityKg > 0).map(crop => (
                                 <div key={crop.id} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 hover:shadow-md transition-shadow group">
                                     <div className="flex justify-between items-start mb-4">
                                         <div className="h-12 w-12 bg-emerald-100 rounded-full flex items-center justify-center text-xl">🥗</div>
@@ -190,7 +206,7 @@ export default function ConsumerDashboard() {
                                     </div>
                                 </div>
                             ))}
-                            {crops.length === 0 && <p className="text-slate-400 col-span-3 text-center py-20">No crops available right now.</p>}
+                            {crops.filter(crop => crop.quantityKg > 0).length === 0 && <p className="text-slate-400 col-span-3 text-center py-20">No crops available right now.</p>}
                         </div>
                     </div>
                 )}
