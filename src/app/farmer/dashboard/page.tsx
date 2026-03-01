@@ -314,6 +314,7 @@ export default function FarmerDashboard() {
 
     // Tab State
     const [activeTab, setActiveTab] = useState<'orders' | 'add' | 'listings'>('orders');
+    const [addMode, setAddMode] = useState<'voice' | 'manual'>('voice');
 
     // ... (rest of existing state and logic remains, I will just re-render the return)
 
@@ -444,6 +445,7 @@ export default function FarmerDashboard() {
 
                                         <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                                             <div>
+                                                <p className="text-xs text-slate-500 mb-1">Items: ₹{order.totalAmount} + Delivery: ₹{order.deliveryCharge}</p>
                                                 <p className="text-xs text-slate-400 uppercase font-bold">Total</p>
                                                 <p className="text-xl font-bold text-emerald-700">₹{order.totalAmount + order.deliveryCharge}</p>
                                             </div>
@@ -466,26 +468,59 @@ export default function FarmerDashboard() {
                     </section>
                 )}
 
-                {/* TAB 2: ADD CROP (VOICE AI) */}
+                {/* TAB 2: ADD CROP (VOICE AI OR MANUAL) */}
                 {activeTab === 'add' && (
                     <section className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <div className="bg-gradient-to-br from-emerald-50 to-white rounded-3xl p-6 md:p-12 border border-emerald-100 shadow-lg shadow-emerald-50 relative overflow-hidden min-h-[500px] flex flex-col justify-center">
-                            <div className="absolute top-0 right-0 p-8 opacity-5">
-                                <Sparkles size={200} />
-                            </div>
-                            <div className="relative z-10 w-full max-w-lg mx-auto">
-                                <div className="text-center mb-8">
-                                    <h2 className="text-3xl font-bold text-slate-800 mb-2">AI Voice Assistant</h2>
-                                    <p className="text-slate-500 text-lg">Speak naturally to describe your crop:</p>
-                                    <p className="text-emerald-600 font-medium mt-2 text-lg italic">"Tell me the crop name, quantity, and price. I can even suggest prices!"</p>
-                                    {wsConnected && <span className="inline-block mt-4 text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-100 px-3 py-1 rounded-full">⚡ Intelligent AI Active</span>}
-                                </div>
-                                <VoiceQAFlow onComplete={(data) => {
-                                    onCropDataComplete(data);
-                                    setTimeout(() => setActiveTab('listings'), 2000);
-                                }} />
-                            </div>
+                        {/* Mode Toggle */}
+                        <div className="bg-white p-1 rounded-xl border border-slate-200 grid grid-cols-2 gap-1 max-w-md mx-auto">
+                            <button onClick={() => setAddMode('voice')} className={`py-2 rounded-lg text-sm font-bold transition-all ${addMode === 'voice' ? 'bg-emerald-50 text-emerald-700 shadow-sm' : 'text-slate-400'}`}>
+                                <Volume2 size={16} className="inline mr-1" /> Voice AI
+                            </button>
+                            <button onClick={() => setAddMode('manual')} className={`py-2 rounded-lg text-sm font-bold transition-all ${addMode === 'manual' ? 'bg-emerald-50 text-emerald-700 shadow-sm' : 'text-slate-400'}`}>
+                                <Pencil size={16} className="inline mr-1" /> Manual
+                            </button>
                         </div>
+
+                        {addMode === 'voice' ? (
+                            <div className="bg-gradient-to-br from-emerald-50 to-white rounded-3xl p-6 md:p-12 border border-emerald-100 shadow-lg shadow-emerald-50 relative overflow-hidden min-h-[500px] flex flex-col justify-center">
+                                <div className="absolute top-0 right-0 p-8 opacity-5">
+                                    <Sparkles size={200} />
+                                </div>
+                                <div className="relative z-10 w-full max-w-lg mx-auto">
+                                    <div className="text-center mb-8">
+                                        <h2 className="text-3xl font-bold text-slate-800 mb-2">AI Voice Assistant</h2>
+                                        <p className="text-slate-500 text-lg">Speak naturally to describe your crop:</p>
+                                        <p className="text-emerald-600 font-medium mt-2 text-lg italic">"Tell me the crop name, quantity, and price. I can even suggest prices!"</p>
+                                        {wsConnected && <span className="inline-block mt-4 text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-100 px-3 py-1 rounded-full">⚡ Intelligent AI Active</span>}
+                                    </div>
+                                    <VoiceQAFlow onComplete={(data) => {
+                                        onCropDataComplete(data);
+                                        setTimeout(() => setActiveTab('listings'), 2000);
+                                    }} />
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="bg-white rounded-3xl p-8 border border-slate-100 shadow-sm max-w-md mx-auto">
+                                <h2 className="text-2xl font-bold text-slate-800 mb-6 text-center">Add Crop Manually</h2>
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">Crop Name</label>
+                                        <input type="text" value={cropName} onChange={(e) => setCropName(e.target.value)} placeholder="e.g., Tomato" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">Quantity (kg)</label>
+                                        <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="e.g., 50" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-bold text-slate-700 mb-2">Price per kg (₹)</label>
+                                        <input type="number" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} placeholder="e.g., 40" className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent" />
+                                    </div>
+                                    <Button onClick={submitCrop} isLoading={isSubmitting} disabled={!cropName || !quantity} className="w-full bg-emerald-600 hover:bg-emerald-700 py-3 rounded-xl font-bold">
+                                        Add Crop
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
                     </section>
                 )}
 

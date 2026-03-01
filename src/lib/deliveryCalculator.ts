@@ -1,14 +1,28 @@
-// Simple pincode distance calculator (simulated)
-// In production, use Google Maps Distance Matrix API or similar
+// Pincode to coordinates using external API
 
-const PINCODE_COORDS: Record<string, { lat: number; lng: number }> = {
-    '600001': { lat: 13.0827, lng: 80.2707 }, // Chennai
-    '600002': { lat: 13.0878, lng: 80.2785 },
-    '600003': { lat: 13.0732, lng: 80.2609 },
-    '110001': { lat: 28.6139, lng: 77.2090 }, // Delhi
-    '400001': { lat: 18.9388, lng: 72.8354 }, // Mumbai
-    '560001': { lat: 12.9716, lng: 77.5946 }, // Bangalore
-};
+async function getPincodeCoordinates(pincode: string): Promise<{ lat: number; lng: number } | null> {
+    try {
+        // Using India Post Pincode API (free, no key required)
+        const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+        const data = await response.json();
+        
+        console.log(`Pincode ${pincode} API response:`, JSON.stringify(data[0]));
+        
+        if (data[0]?.Status === 'Success' && data[0]?.PostOffice?.[0]) {
+            const { Latitude, Longitude } = data[0].PostOffice[0];
+            if (Latitude && Longitude) {
+                const coords = { lat: parseFloat(Latitude), lng: parseFloat(Longitude) };
+                console.log(`Pincode ${pincode} coordinates:`, coords);
+                return coords;
+            }
+        }
+        console.log(`Pincode ${pincode} lookup failed`);
+        return null;
+    } catch (error) {
+        console.error(`Pincode ${pincode} API error:`, error);
+        return null;
+    }
+}
 
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
     const R = 6371; // Radius of the Earth in km
@@ -23,20 +37,31 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
     return distance;
 }
 
-export function calculateDeliveryCharge(farmerPincode: string, consumerPincode: string): number {
-    // Get coordinates for both pincodes
-    const farmerCoords = PINCODE_COORDS[farmerPincode];
-    const consumerCoords = PINCODE_COORDS[consumerPincode];
-
-    // If either pincode is not in our database, use default charge
-    if (!farmerCoords || !consumerCoords) {
-        // Estimate based on pincode difference
-        const diff = Math.abs(parseInt(farmerPincode) - parseInt(consumerPincode));
-        const estimatedKm = Math.min(diff / 100, 50); // Cap at 50km
-        return Math.round(estimatedKm * 10); // ₹10 per km
+export async function calculateDeliveryCharge(farmerPincode: string, consumerPincode: string): Promise<{ charge: number; distance: number }> {
+    console.log(`Calculating delivery charge from ${farmerPincode} to ${consumerPincode}`);
+    
+    // Validate Indian pincodes (6 digits)
+    if (!/^\d{6}$/.test(farmerPincode) || !/^\d{6}$/.test(consumerPincode)) {
+        console.log('Invalid pincode format');
+        return { charge: 100, distance: 10 }; // Default
     }
 
-    // Calculate actual distance
+    // Get coordinates for both pincodes
+    const [farmerCoords, consumerCoords] = await Promise.all([
+        getPincodeCoordinates(farmerPincode),
+        getPincodeCoordinates(consumerPincode)
+    ]);
+
+    // If either pincode lookup fails, estimate based on pincode difference
+    if (!farmerCoords || !consumerCoords) {
+        console.log('Using fallback estimation');
+        const diff = Math.abs(parseInt(farmerPincode) - parseInt(consumerPincode));
+        const estimatedKm = diff / 100; // Remove cap, let it be dynamic
+        console.log(`Estimated distance: ${estimatedKm} km, charge: ₹${Math.round(estimatedKm * 10)}`);
+        return { charge: Math.round(estimatedKm * 10), distance: estimatedKm }; // ₹10 per km
+    }
+
+    // Calculate actual distance using Haversine formula
     const distanceKm = calculateDistance(
         farmerCoords.lat,
         farmerCoords.lng,
@@ -44,7 +69,9 @@ export function calculateDeliveryCharge(farmerPincode: string, consumerPincode: 
         consumerCoords.lng
     );
 
-    // ₹10 per km, minimum ₹20
-    const charge = Math.max(Math.round(distanceKm * 10), 20);
-    return charge;
+    console.log(`Actual distance: ${distanceKm} km, charge: ₹${Math.round(distanceKm * 10)}`);
+    
+    // ₹10 per km (e.g., 150 km = ₹1,500)
+    const charge = Math.round(distanceKm * 10);
+    return { charge, distance: distanceKm };
 }

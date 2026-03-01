@@ -3,6 +3,17 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+/**
+ * Seed script to populate the database with initial data
+ * Run: npx ts-node --compiler-options '{"module":"commonjs"}' prisma/seed.ts
+ * 
+ * Seeds:
+ * - Pincode locations (Chennai area)
+ * - Test users (farmer@test.com / consumer@test.com, password: password123)
+ * - Sample crops (Tomato, Potato, Onion)
+ * - Sample order history
+ * - Interview questions
+ */
 async function main() {
     // Seed Pincode Locations (Chennai Examples)
     await prisma.pincodeLocation.createMany({
@@ -54,6 +65,65 @@ async function main() {
     });
 
     console.log('Seeded users: farmer@test.com / consumer@test.com');
+
+    // Get farmer and consumer
+    const farmer = await prisma.user.findUnique({ where: { email: 'farmer@test.com' } });
+    const consumer = await prisma.user.findUnique({ where: { email: 'consumer@test.com' } });
+
+    // Seed Crops
+    const tomato = await prisma.crop.create({
+        data: {
+            name: 'Tomato',
+            quantityKg: 50,
+            basePrice: 40,
+            farmerPincode: '600001',
+            farmerId: farmer!.id
+        }
+    });
+
+    const potato = await prisma.crop.create({
+        data: {
+            name: 'Potato',
+            quantityKg: 100,
+            basePrice: 30,
+            farmerPincode: '600001',
+            farmerId: farmer!.id
+        }
+    });
+
+    const onion = await prisma.crop.create({
+        data: {
+            name: 'Onion',
+            quantityKg: 75,
+            basePrice: 35,
+            farmerPincode: '600001',
+            farmerId: farmer!.id
+        }
+    });
+
+    console.log('Seeded crops');
+
+    // Seed Order with Order History
+    const order = await prisma.order.create({
+        data: {
+            consumerId: consumer!.id,
+            farmerId: farmer!.id,
+            status: 'DELIVERED',
+            totalAmount: 2200,
+            deliveryCharge: 50,
+            deliveryTime: 'Morning',
+            deliveryAddress: 'T. Nagar, Chennai',
+            deliveryPincode: '600017',
+            items: {
+                create: [
+                    { cropId: tomato.id, quantity: 10, price: 40 },
+                    { cropId: potato.id, quantity: 20, price: 30 }
+                ]
+            }
+        }
+    });
+
+    console.log('Seeded order history');
 
     // Seed Questions
     await prisma.question.createMany({

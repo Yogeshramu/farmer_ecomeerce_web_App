@@ -55,7 +55,7 @@ export async function POST(request: Request) {
 
             // Calculate delivery charge based on pincodes (₹10/km)
             const farmerPincode = farmer.pincode || '600001'; // Default if not set
-            const deliveryCharge = calculateDeliveryCharge(farmerPincode, deliveryPincode);
+            const { charge: deliveryCharge } = await calculateDeliveryCharge(farmerPincode, deliveryPincode);
 
             const itemsTotal = farmerItems.reduce((sum, i) => sum + (i.quantity * i.crop.basePrice), 0);
 

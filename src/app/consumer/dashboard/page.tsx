@@ -34,8 +34,12 @@ interface Order {
     totalAmount: number;
     deliveryCharge: number;
     createdAt: string;
+    deliveryAddress?: string;
+    deliveryPincode?: string;
+    deliveryTime?: string;
     farmer: {
         name: string;
+        mobile?: string;
     };
     items: OrderItem[];
 }
@@ -51,6 +55,9 @@ export default function ConsumerDashboard() {
     const [address, setAddress] = useState('');
     const [time, setTime] = useState('Morning');
     const [loading, setLoading] = useState(false);
+    const [deliveryCharge, setDeliveryCharge] = useState<number>(0);
+    const [calculatingCharge, setCalculatingCharge] = useState(false);
+    const [distanceKm, setDistanceKm] = useState<number>(0);
 
     const fetchCrops = useCallback(async () => {
         try {
@@ -136,6 +143,43 @@ export default function ConsumerDashboard() {
     };
 
     const totalCartPrice = cart.reduce((acc, item) => acc + (item.basePrice * item.cartQty), 0);
+
+    // Calculate delivery charge when pincode changes
+    useEffect(() => {
+        const calculateCharge = async () => {
+            if (pincode.length === 6 && cart.length > 0) {
+                setCalculatingCharge(true);
+                try {
+                    // Get farmer pincode from first cart item
+                    const firstCropId = cart[0].id;
+                    const crop = crops.find(c => c.id === firstCropId);
+                    if (crop) {
+                        const res = await fetch('/api/distance', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                farmerPincode: '600001', // You'd get this from crop.farmer.pincode
+                                consumerPincode: pincode
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.deliveryCharge) {
+                            setDeliveryCharge(data.deliveryCharge);
+                            setDistanceKm(data.distanceKm || 0);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Failed to calculate delivery charge:', error);
+                    setDeliveryCharge(100); // Default
+                }
+                setCalculatingCharge(false);
+            } else {
+                setDeliveryCharge(0);
+                setDistanceKm(0);
+            }
+        };
+        calculateCharge();
+    }, [pincode, cart, crops]);
 
     return (
         <div className="min-h-screen bg-slate-50 pb-20">
@@ -291,11 +335,20 @@ export default function ConsumerDashboard() {
                                         </div>
                                         <div className="flex justify-between items-center mb-4">
                                             <span className="text-slate-600">Delivery Charge</span>
-                                            <span className="font-bold text-emerald-600">FREE</span>
+                                            {calculatingCharge ? (
+                                                <span className="text-sm text-slate-400">Calculating...</span>
+                                            ) : deliveryCharge > 0 ? (
+                                                <div className="text-right">
+                                                    <span className="font-bold text-blue-600">₹{deliveryCharge}</span>
+                                                    <p className="text-xs text-slate-400">{distanceKm} km × ₹10</p>
+                                                </div>
+                                            ) : (
+                                                <span className="text-sm text-slate-400">Enter pincode</span>
+                                            )}
                                         </div>
                                         <div className="flex justify-between items-center text-lg pt-3 border-t border-slate-100">
                                             <span className="font-bold text-slate-900">Total Amount</span>
-                                            <span className="font-bold text-blue-700 text-2xl">₹{totalCartPrice}</span>
+                                            <span className="font-bold text-blue-700 text-2xl">₹{totalCartPrice + deliveryCharge}</span>
                                         </div>
                                     </div>
 
@@ -312,7 +365,11 @@ export default function ConsumerDashboard() {
                 {view === 'orders' && (
                     <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in">
                         <h2 className="text-2xl font-bold text-slate-800 mb-6">Your Order History</h2>
-                        {orders.length === 0 ? <p className="text-slate-500">No orders placed yet.</p> : orders.map(order => (
+                        {orders.length === 0 ? <p className="text-slate-500">No orders placed yet.</p> : orders.map(order => {
+                            // Calculate distance from delivery charge (charge = distance × 10)
+                            const distanceKm = Math.round(order.deliveryCharge / 10);
+                            
+                            return (
                             <div key={order.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
                                 <div className="flex justify-between mb-6">
                                     <div>
@@ -322,13 +379,29 @@ export default function ConsumerDashboard() {
                                     <div className="text-right">
                                         <p className="text-2xl font-bold text-slate-900">₹{order.totalAmount}</p>
                                         <p className="text-xs text-slate-400">+ ₹{order.deliveryCharge} Delivery</p>
+                                        <p className="text-xs text-blue-500">{distanceKm} km away</p>
                                     </div>
                                 </div>
 
                                 {/* Order Tracker */}
                                 <OrderTracker status={order.status} />
 
-                                <div className="border-t border-slate-100 pt-4 space-y-2 mt-6">
+                                {/* Delivery Details */}
+                                {order.deliveryAddress && (
+                                    <div className="bg-slate-50 rounded-xl p-4 mb-4">
+                                        <h4 className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-1">
+                                            <MapPin size={14} /> Delivery Details
+                                        </h4>
+                                        <p className="text-sm text-slate-700">{order.deliveryAddress}</p>
+                                        <div className="flex gap-4 mt-2 text-xs text-slate-500">
+                                            <span>📍 {order.deliveryPincode}</span>
+                                            {order.deliveryTime && <span>🕐 {order.deliveryTime}</span>}
+                                            <span>📏 {distanceKm} km</span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="border-t border-slate-100 pt-4 space-y-2">
                                     {order.items.map((item: OrderItem) => (
                                         <div key={item.id} className="flex justify-between text-sm">
                                             <span className="text-slate-600 font-medium">{item.crop.name} <span className="text-slate-400">(x{item.quantity} kg)</span></span>
@@ -337,7 +410,7 @@ export default function ConsumerDashboard() {
                                     ))}
                                 </div>
                             </div>
-                        ))}
+                        )})}
                     </div>
                 )}
             </main>

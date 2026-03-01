@@ -16,9 +16,8 @@ function deg2rad(deg: number): number {
 }
 
 export function calculateDeliveryCharge(distance: number): number {
-    if (distance < 10) return 30; // Low charge (Rs 30)
-    if (distance <= 30) return 60; // Medium charge
-    return 120; // High charge
+    // ₹10 per km
+    return Math.round(distance * 10);
 }
 
 export function getVehicleType(distance: number): "Bike" | "Van" {

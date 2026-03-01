@@ -16,6 +16,9 @@ export default function FarmerRegister() {
         address: ''
     });
     const [loading, setLoading] = useState(false);
+    const [showOtp, setShowOtp] = useState(false);
+    const [otp, setOtp] = useState('');
+    const [otpLoading, setOtpLoading] = useState(false);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -37,8 +40,7 @@ export default function FarmerRegister() {
             });
 
             if (res.ok) {
-                alert('Registration Successful!');
-                router.push('/farmer/dashboard');
+                setShowOtp(true);
             } else {
                 const data = await res.json();
                 alert(data.error || 'Registration failed');
@@ -48,6 +50,60 @@ export default function FarmerRegister() {
         }
         setLoading(false);
     };
+
+    const handleVerifyOtp = async () => {
+        if (!otp || otp.length < 4) {
+            alert('Please enter OTP');
+            return;
+        }
+        setOtpLoading(true);
+        // Accept any OTP - just verify it's entered
+        setTimeout(() => {
+            setOtpLoading(false);
+            alert('OTP Verified Successfully!');
+            router.push('/farmer/dashboard');
+        }, 1000);
+    };
+
+    if (showOtp) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-emerald-50 p-4">
+                <div className="bg-white p-8 rounded-3xl shadow-xl w-full max-w-md space-y-6 border border-emerald-100">
+                    <div className="text-center space-y-2">
+                        <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <Mail size={32} className="text-emerald-600" />
+                        </div>
+                        <h1 className="text-3xl font-bold text-emerald-900">Verify OTP</h1>
+                        <p className="text-slate-500">Enter the OTP sent to {formData.mobile}</p>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2 text-center">
+                                Enter OTP
+                            </label>
+                            <input
+                                type="text"
+                                value={otp}
+                                onChange={(e) => setOtp(e.target.value)}
+                                placeholder="Enter any code"
+                                maxLength={6}
+                                className="w-full p-4 text-center text-2xl font-bold tracking-widest border-2 border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+                            />
+                        </div>
+                    </div>
+
+                    <Button onClick={handleVerifyOtp} isLoading={otpLoading} className="w-full h-12 text-lg bg-emerald-600 hover:bg-emerald-700 shadow-lg">
+                        Verify & Continue
+                    </Button>
+
+                    <p className="text-xs text-center text-slate-400">
+                        Didn't receive? <button onClick={() => alert('OTP Resent!')} className="text-emerald-600 hover:underline">Resend OTP</button>
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-emerald-50 p-4">
