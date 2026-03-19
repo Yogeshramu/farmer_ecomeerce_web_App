@@ -51,3 +51,5 @@ A full-stack application connecting farmers directly with consumers using Next.j
 - `app/consumer`: Consumer pages.
 - `lib/`: Utilities (Distance calc, Auth, Prisma).
 - `prisma/`: Database Schema.
+
+and also in consumer dashboard whenever the crop is added it should show with date to the consumer added by farmer

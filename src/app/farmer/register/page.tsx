@@ -74,13 +74,15 @@ export default function FarmerRegister() {
                             <Mail size={32} className="text-emerald-600" />
                         </div>
                         <h1 className="text-3xl font-bold text-emerald-900">Verify OTP</h1>
+                        <p className="text-emerald-400 text-sm">முறையீடு சரிபார்க்க</p>
                         <p className="text-slate-500">Enter the OTP sent to {formData.mobile}</p>
+                        <p className="text-slate-400 text-sm">{formData.mobile} க்கு அனுப்பப்பட்ட முறையீடை உளளிடவும்</p>
                     </div>
 
                     <div className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-2 text-center">
-                                Enter OTP
+                                Enter OTP <span className="text-slate-400 font-normal">முறையீடை உளளிட</span>
                             </label>
                             <input
                                 type="text"
@@ -93,12 +95,14 @@ export default function FarmerRegister() {
                         </div>
                     </div>
 
-                    <Button onClick={handleVerifyOtp} isLoading={otpLoading} className="w-full h-12 text-lg bg-emerald-600 hover:bg-emerald-700 shadow-lg">
-                        Verify & Continue
+                    <Button onClick={handleVerifyOtp} isLoading={otpLoading} className="w-full h-12 text-lg bg-emerald-600 hover:bg-emerald-700 shadow-lg flex flex-col gap-0">
+                        <span>Verify & Continue</span>
+                        <span className="text-[10px] font-normal opacity-80">சரிபார்க்கி தொடர்</span>
                     </Button>
 
                     <p className="text-xs text-center text-slate-400">
                         Didn't receive? <button onClick={() => alert('OTP Resent!')} className="text-emerald-600 hover:underline">Resend OTP</button>
+                        <br /><span className="text-slate-300">முறையீடு கிடைக்கவில்லையா?</span>
                     </p>
                 </div>
             </div>
@@ -112,15 +116,17 @@ export default function FarmerRegister() {
                     <ArrowLeft size={16} className="mr-1" /> Back
                 </Button>
 
-                <div className="text-center space-y-2">
+                <div className="text-center space-y-1">
                     <h1 className="text-3xl font-bold text-emerald-900">Farmer Registration</h1>
+                    <p className="text-emerald-400 text-sm">விவசாயி பதிவு</p>
                     <p className="text-slate-500">Join FarmDirect to sell your crops</p>
+                    <p className="text-slate-400 text-sm">பயிர் விற்க FarmDirect-ஆல் இணையும்</p>
                 </div>
 
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">
-                            <User size={16} className="inline mr-1" /> Full Name *
+                            <User size={16} className="inline mr-1" /> Full Name * <span className="text-slate-400 font-normal text-xs">முழு பெயர்</span>
                         </label>
                         <input
                             name="name"
@@ -133,7 +139,7 @@ export default function FarmerRegister() {
 
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">
-                            <Mail size={16} className="inline mr-1" /> Email Address *
+                            <Mail size={16} className="inline mr-1" /> Email Address * <span className="text-slate-400 font-normal text-xs">மின்னஞ்சல் முகவரி</span>
                         </label>
                         <input
                             name="email"
@@ -147,7 +153,7 @@ export default function FarmerRegister() {
 
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">
-                            <Lock size={16} className="inline mr-1" /> Password *
+                            <Lock size={16} className="inline mr-1" /> Password * <span className="text-slate-400 font-normal text-xs">கடவுச்சொல்</span>
                         </label>
                         <input
                             name="password"
@@ -161,7 +167,7 @@ export default function FarmerRegister() {
 
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-2">
-                            <Phone size={16} className="inline mr-1" /> Mobile Number *
+                            <Phone size={16} className="inline mr-1" /> Mobile Number * <span className="text-slate-400 font-normal text-xs">கைபேசி எண்</span>
                         </label>
                         <input
                             name="mobile"
@@ -177,7 +183,7 @@ export default function FarmerRegister() {
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-2">
-                                <MapPin size={16} className="inline mr-1" /> Pincode
+                                <MapPin size={16} className="inline mr-1" /> Pincode <span className="text-slate-400 font-normal text-xs">ஐந்தேட் குறியீடு</span>
                             </label>
                             <input
                                 name="pincode"
@@ -189,7 +195,7 @@ export default function FarmerRegister() {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-slate-700 mb-2">
-                                <Home size={16} className="inline mr-1" /> Village/Area
+                                <Home size={16} className="inline mr-1" /> Village/Area <span className="text-slate-400 font-normal text-xs">கிராமம் / பகுதி</span>
                             </label>
                             <input
                                 name="address"
@@ -201,12 +207,14 @@ export default function FarmerRegister() {
                     </div>
                 </div>
 
-                <Button onClick={handleRegister} isLoading={loading} className="w-full h-12 text-lg bg-emerald-600 hover:bg-emerald-700 shadow-lg">
-                    Create Account
+                <Button onClick={handleRegister} isLoading={loading} className="w-full h-12 text-lg bg-emerald-600 hover:bg-emerald-700 shadow-lg flex flex-col gap-0">
+                    <span>Create Account</span>
+                    <span className="text-[10px] font-normal opacity-80">கணக்கை உருவாக்கு</span>
                 </Button>
 
                 <p className="text-xs text-center text-slate-400">
                     Already have an account? <a href="/farmer/login" className="text-emerald-600 hover:underline">Login here</a>
+                    <br /><span className="text-slate-300">கணக்கு உள்ளதா? <a href="/farmer/login" className="text-emerald-500 hover:underline">இங்கே உள்நுழையும்</a></span>
                 </p>
             </div>
         </div>

@@ -14,7 +14,7 @@ export async function POST(request: Request) {
         return NextResponse.json({
             farmerPincode,
             consumerPincode,
-            distanceKm: Math.round(distance),
+            distanceKm: parseFloat(distance.toFixed(1)), // Keep one decimal place
             deliveryCharge: charge,
             formula: 'Distance (km) × ₹10'
         });

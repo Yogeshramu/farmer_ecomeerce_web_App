@@ -8,7 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "ws": "node websocket-server.mjs",
-    "dev:all": "concurrently \"npm run ws\" \"npm run dev\" --names \"WS,NEXT\" --prefix-colors \"blue,green\""
+    "dev:all": "concurrently \"npm run ws\" \"npm run dev\" --names \"WS,NEXT\" --prefix-colors \"blue,green\"",
+    "db:seed": "npx prisma db seed",
+    "docker:up": "docker-compose up --build",
+    "docker:down": "docker-compose down",
+    "docker:reset": "docker-compose down -v && docker-compose up --build"
   },
   "prisma": {
     "seed": "npx tsx prisma/seed.ts"
@@ -22,6 +26,7 @@
     "next": "16.1.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "recharts": "^3.8.0",
     "ws": "^8.19.0"
   },
   "devDependencies": {

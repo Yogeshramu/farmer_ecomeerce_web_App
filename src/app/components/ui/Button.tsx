@@ -17,11 +17,11 @@ export function Button({
     const baseStyles = "inline-flex items-center justify-center rounded-xl font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 active:scale-95";
 
     const variants = {
-        primary: "bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-500/20",
-        secondary: "bg-slate-100 text-slate-900 hover:bg-slate-200",
-        outline: "border border-slate-200 bg-transparent hover:bg-slate-50",
-        ghost: "hover:bg-slate-100 hover:text-slate-900",
-        danger: "bg-red-500 text-white hover:bg-red-600",
+        primary: "bg-green-600 text-white hover:bg-green-700 shadow-lg shadow-green-600/20 active:scale-95",
+        secondary: "bg-green-50 text-green-700 hover:bg-green-100",
+        outline: "border border-green-200 bg-transparent hover:bg-green-50 text-green-700",
+        ghost: "hover:bg-green-50 hover:text-green-700 text-slate-600",
+        danger: "bg-red-500 text-white hover:bg-red-600 shadow-lg shadow-red-500/20",
     };
 
     const sizes = {

@@ -6,10 +6,12 @@ import { calculateDeliveryCharge } from '@/lib/deliveryCalculator';
 interface GroupedItem {
     cropId: string;
     quantity: number;
+    decodedQty?: number;
     crop: {
         id: string;
         farmerId: string;
         basePrice: number;
+        quantityKg: number;
         farmer: {
             pincode: string | null;
         };
@@ -24,7 +26,7 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json();
-        const { items, deliveryPincode, deliveryAddress, deliveryTime } = body;
+        const { items, deliveryPincode, deliveryAddress, deliveryTime, contactNumber } = body;
 
         if (!items || items.length === 0) {
             return NextResponse.json({ error: 'Cart is empty' }, { status: 400 });
@@ -40,10 +42,15 @@ export async function POST(request: Request) {
             });
             if (!crop) continue;
 
+            const orderQty = parseFloat(item.quantity.toString());
+            if (crop.quantityKg < orderQty) {
+                return NextResponse.json({ error: `Not enough stock for ${crop.name}. Only ${crop.quantityKg}kg available.` }, { status: 400 });
+            }
+
             if (!itemsByFarmer[crop.farmerId]) {
                 itemsByFarmer[crop.farmerId] = [];
             }
-            itemsByFarmer[crop.farmerId].push({ ...item, crop });
+            itemsByFarmer[crop.farmerId].push({ ...item, crop, decodedQty: orderQty });
         }
 
         const createdOrders = [];
@@ -55,12 +62,21 @@ export async function POST(request: Request) {
 
             // Calculate delivery charge based on pincodes (₹10/km)
             const farmerPincode = farmer.pincode || '600001'; // Default if not set
-            const { charge: deliveryCharge } = await calculateDeliveryCharge(farmerPincode, deliveryPincode);
+            const { charge } = await calculateDeliveryCharge(farmerPincode, deliveryPincode);
+            
+            // Check for free delivery condition (buying at least 25% of a crop's stock)
+            const qualifiesForFreeDelivery = farmerItems.some(i => {
+                const orderQty = i.decodedQty || parseFloat(i.quantity.toString());
+                const availableStock = i.crop.quantityKg;
+                return orderQty >= (availableStock * 0.25);
+            });
+            
+            const deliveryCharge = qualifiesForFreeDelivery ? 0 : charge;
 
             const itemsTotal = farmerItems.reduce((sum, i) => sum + (i.quantity * i.crop.basePrice), 0);
 
             // Create Order
-            const order = await prisma.order.create({
+            const order = await (prisma as any).order.create({
                 data: {
                     consumerId: session.id as string,
                     farmerId: farmerId,
@@ -70,10 +86,11 @@ export async function POST(request: Request) {
                     deliveryAddress,
                     deliveryPincode,
                     deliveryTime,
+                    contactNumber,
                     items: {
                         create: farmerItems.map(i => ({
                             cropId: i.cropId,
-                            quantity: parseFloat(i.quantity.toString()),
+                            quantity: i.decodedQty || parseFloat(i.quantity.toString()),
                             price: i.crop.basePrice
                         }))
                     }
@@ -81,7 +98,24 @@ export async function POST(request: Request) {
                 include: { items: true }
             });
 
+            // Decrement crop quantities and auto-delete if out of stock
+            for (const i of farmerItems) {
+                const qtyToDeduct = i.decodedQty || parseFloat(i.quantity.toString());
+                const updatedCrop = await prisma.crop.update({
+                    where: { id: i.cropId },
+                    data: {
+                        quantityKg: {
+                            decrement: qtyToDeduct
+                        }
+                    }
+                });
+
+                // No auto-delete here. Keeping records for history. 
+                // Front-end filters by quantityKg > 0.
+            }
+
             createdOrders.push(order);
+
         }
 
         return NextResponse.json({ success: true, orders: createdOrders });
@@ -109,7 +143,8 @@ export async function GET() {
             include: {
                 items: { include: { crop: true } },
                 consumer: { select: { name: true, mobile: true, email: true, address: true } },
-                farmer: { select: { name: true, mobile: true } }
+                farmer: { select: { name: true, mobile: true } },
+                review: true
             },
             orderBy: { createdAt: 'desc' }
         });

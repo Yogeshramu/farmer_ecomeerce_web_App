@@ -125,6 +125,43 @@ async function main() {
 
     console.log('Seeded order history');
 
+    // Seed Reviews
+    await (prisma as any).review.create({
+        data: {
+            rating: 5,
+            comment: "Excellent quality tomatoes, very fresh! Highly recommend.",
+            cropId: tomato.id,
+            consumerId: consumer!.id,
+            orderId: order.id
+        }
+    });
+    console.log('Seeded sample reviews');
+
+    // Seed more crops from another farmer (Community crops)
+    const farmer2 = await prisma.user.upsert({
+        where: { email: 'farmer2@test.com' },
+        update: {},
+        create: {
+            name: 'Suresh Kumar',
+            email: 'farmer2@test.com',
+            password,
+            role: 'FARMER',
+            mobile: '9123456788',
+            pincode: '625001',
+            latitude: 9.9252,
+            longitude: 78.1198
+        }
+    });
+
+    await prisma.crop.createMany({
+        data: [
+            { name: 'Carrot', quantityKg: 60, basePrice: 45, farmerPincode: '625001', farmerId: farmer2.id },
+            { name: 'Cabbage', quantityKg: 40, basePrice: 25, farmerPincode: '625001', farmerId: farmer2.id },
+            { name: 'Cauliflower', quantityKg: 30, basePrice: 50, farmerPincode: '625001', farmerId: farmer2.id }
+        ]
+    });
+    console.log('Seeded community crops from other farmers');
+
     // Seed Questions
     await prisma.question.createMany({
         data: [

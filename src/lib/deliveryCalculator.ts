@@ -2,21 +2,28 @@
 
 async function getPincodeCoordinates(pincode: string): Promise<{ lat: number; lng: number } | null> {
     try {
-        // Using India Post Pincode API (free, no key required)
-        const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
-        const data = await response.json();
-        
-        console.log(`Pincode ${pincode} API response:`, JSON.stringify(data[0]));
-        
-        if (data[0]?.Status === 'Success' && data[0]?.PostOffice?.[0]) {
-            const { Latitude, Longitude } = data[0].PostOffice[0];
-            if (Latitude && Longitude) {
-                const coords = { lat: parseFloat(Latitude), lng: parseFloat(Longitude) };
-                console.log(`Pincode ${pincode} coordinates:`, coords);
-                return coords;
-            }
+        console.log(`Looking up coordinates for pincode: ${pincode}`);
+        // Using Zippopotam.us (free, provides coordinates for India)
+        const response = await fetch(`https://api.zippopotam.us/in/${pincode}`);
+
+        if (!response.ok) {
+            console.log(`Zippopotam API lookup failed for ${pincode}: ${response.status}`);
+            return null;
         }
-        console.log(`Pincode ${pincode} lookup failed`);
+
+        const data = await response.json();
+
+        if (data.places && data.places.length > 0) {
+            const place = data.places[0];
+            const coords = {
+                lat: parseFloat(place.latitude),
+                lng: parseFloat(place.longitude)
+            };
+            console.log(`Pincode ${pincode} coordinates:`, coords);
+            return coords;
+        }
+
+        console.log(`Pincode ${pincode} not found in Zippopotam`);
         return null;
     } catch (error) {
         console.error(`Pincode ${pincode} API error:`, error);
@@ -39,7 +46,7 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 
 export async function calculateDeliveryCharge(farmerPincode: string, consumerPincode: string): Promise<{ charge: number; distance: number }> {
     console.log(`Calculating delivery charge from ${farmerPincode} to ${consumerPincode}`);
-    
+
     // Validate Indian pincodes (6 digits)
     if (!/^\d{6}$/.test(farmerPincode) || !/^\d{6}$/.test(consumerPincode)) {
         console.log('Invalid pincode format');
@@ -70,7 +77,7 @@ export async function calculateDeliveryCharge(farmerPincode: string, consumerPin
     );
 
     console.log(`Actual distance: ${distanceKm} km, charge: ₹${Math.round(distanceKm * 10)}`);
-    
+
     // ₹10 per km (e.g., 150 km = ₹1,500)
     const charge = Math.round(distanceKm * 10);
     return { charge, distance: distanceKm };

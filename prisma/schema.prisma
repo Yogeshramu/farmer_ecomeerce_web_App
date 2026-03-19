@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 enum Role {
@@ -37,7 +38,12 @@ model User {
   farmerOrders    Order[] @relation("FarmerOrders")
   consumerOrders  Order[] @relation("ConsumerOrders")
   
+  farmerInquiries   ContactInquiry[] @relation("FarmerInquiries")
+  consumerInquiries ContactInquiry[] @relation("ConsumerInquiries")
+  
   answers         Answer[]
+  
+  consumerReviews Review[] @relation("ConsumerReviews")
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -54,6 +60,9 @@ model Crop {
   farmer        User     @relation(fields: [farmerId], references: [id])
   
   items         OrderItem[]
+  inquiries     ContactInquiry[]
+  
+  reviews       Review[]
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -82,8 +91,11 @@ model Order {
   deliveryTime    String?     // Morning / Afternoon / Evening
   deliveryAddress String?
   deliveryPincode String?
+  contactNumber   String?
   
   items           OrderItem[]
+  
+  review          Review?
   
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
@@ -121,3 +133,45 @@ model Answer {
   
   createdAt   DateTime @default(now())
 }
+
+model ContactInquiry {
+  id          String   @id @default(uuid())
+  consumerId  String
+  consumer    User     @relation("ConsumerInquiries", fields: [consumerId], references: [id])
+  
+  farmerId    String
+  farmer      User     @relation("FarmerInquiries", fields: [farmerId], references: [id])
+  
+  cropId      String?
+  crop        Crop?    @relation(fields: [cropId], references: [id])
+  
+  quantity    Float?
+  proposedPrice Float?
+  deliveryAddress String?
+  contactNumber   String?
+  
+  message     String
+  status      String   @default("PENDING") // PENDING, RESPONDED, CLOSED
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Review {
+  id          String   @id @default(uuid())
+  rating      Int      // 1-5
+  comment     String?
+  
+  cropId      String
+  crop        Crop     @relation(fields: [cropId], references: [id])
+  
+  consumerId  String
+  consumer    User     @relation("ConsumerReviews", fields: [consumerId], references: [id])
+  
+  orderId     String?  @unique // Link to the specific order
+  order       Order?   @relation(fields: [orderId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+

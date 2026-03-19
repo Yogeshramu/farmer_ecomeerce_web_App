@@ -2,18 +2,33 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 
-export async function GET() {
+export async function GET(request: Request) {
     try {
+        const { searchParams } = new URL(request.url);
+        const mine = searchParams.get('mine') === 'true';
+        
+        const session = await getSession();
+        
         const crops = await prisma.crop.findMany({
+            where: mine && session 
+                ? { farmerId: session.id as string } 
+                : { quantityKg: { gt: 0 } },
             include: {
                 farmer: {
-                    select: { name: true, pincode: true, latitude: true, longitude: true }
+                    select: { id: true, name: true, pincode: true, latitude: true, longitude: true }
+                },
+                reviews: {
+                    select: { rating: true }
+                },
+                _count: {
+                    select: { reviews: true }
                 }
             },
             orderBy: { createdAt: 'desc' }
         });
         return NextResponse.json({ crops });
-    } catch {
+    } catch (error) {
+        console.error('Fetch crops error:', error);
         return NextResponse.json({ error: 'Failed to fetch crops' }, { status: 500 });
     }
 }

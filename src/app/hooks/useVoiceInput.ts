@@ -49,8 +49,44 @@ export const useVoiceInput = (language: Language = 'ta-IN') => {
         };
     }, []);
 
-    const speak = useCallback((text: string, onEnd?: () => void) => {
+    const speak = useCallback(async (text: string, onEnd?: () => void) => {
         if (!mountedRef.current) return;
+
+        // 1. Try High-Quality AI Voice API first
+        const speakAI = async () => {
+            try {
+                const response = await fetch('/api/ai/tts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text, language })
+                });
+
+                if (!response.ok) return false;
+
+                const blob = await response.blob();
+                const url = URL.createObjectURL(blob);
+                const audio = new Audio(url);
+
+                audio.onplay = () => setState(prev => ({ ...prev, isSpeaking: true }));
+                audio.onended = () => {
+                    URL.revokeObjectURL(url);
+                    if (mountedRef.current) {
+                        setState(prev => ({ ...prev, isSpeaking: false }));
+                        if (onEnd) onEnd();
+                    }
+                };
+                audio.onerror = () => {
+                    URL.revokeObjectURL(url);
+                    return false;
+                };
+
+                await audio.play();
+                return true; // Success!
+            } catch (err) {
+                console.warn('AI TTS failed, falling back to native TTS...');
+                return false;
+            }
+        };
 
         const speakNative = () => {
             if (!window.speechSynthesis) return false;
@@ -58,8 +94,8 @@ export const useVoiceInput = (language: Language = 'ta-IN') => {
 
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = language;
-            utterance.rate = 0.9;
-            utterance.pitch = 1;
+            utterance.rate = 1.0;
+            utterance.pitch = 1.1;
 
             const voices = window.speechSynthesis.getVoices();
             let selectedVoice = voices.find(v => v.name.includes('Google') && v.lang.startsWith(language.split('-')[0]));
@@ -112,8 +148,11 @@ export const useVoiceInput = (language: Language = 'ta-IN') => {
             }
         };
 
-        const nativeStarted = speakNative();
-        if (!nativeStarted) speakFallback();
+        const aiStarted = await speakAI();
+        if (!aiStarted) {
+            const nativeStarted = speakNative();
+            if (!nativeStarted) speakFallback();
+        }
     }, [language]);
 
     const startListening = useCallback(() => {
@@ -152,23 +191,24 @@ export const useVoiceInput = (language: Language = 'ta-IN') => {
         };
 
         rec.onerror = (event: any) => {
-            // THE CORE FIX: Silence non-critical errors entirely
-            const silentErrors = ['network', 'no-speech', 'aborted'];
-            if (!silentErrors.includes(event.error)) {
-                console.error('Speech Recognition Error:', event.error);
-            }
+            // Silent errors: auto-retry, never show to user
+            const silentErrors = ['network', 'no-speech', 'aborted', 'audio-capture'];
 
             if (mountedRef.current) {
-                let errorMessage = null;
-                if (event.error === 'not-allowed') errorMessage = 'Microphone permission denied';
-                // We keep the state update for UI but avoid the console.error above
-                if (event.error === 'network') errorMessage = 'Connection error';
-
-                setState(prev => ({
-                    ...prev,
-                    isListening: false,
-                    error: errorMessage
-                }));
+                if (event.error === 'not-allowed') {
+                    // Only mic-denied is a real visible error
+                    setState(prev => ({
+                        ...prev,
+                        isListening: false,
+                        error: 'Microphone permission denied. Please allow mic access. / மைக்க ஆன் பண்ணி விடுங்க.'
+                    }));
+                } else if (silentErrors.includes(event.error)) {
+                    // Silently clear listening state — VoiceQAFlow will handle retry via tap
+                    setState(prev => ({ ...prev, isListening: false, error: null }));
+                } else {
+                    console.warn('Speech Recognition Error:', event.error);
+                    setState(prev => ({ ...prev, isListening: false, error: null }));
+                }
             }
         };
 

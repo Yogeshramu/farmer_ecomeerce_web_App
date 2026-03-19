@@ -6,7 +6,7 @@ import { login } from '@/lib/auth';
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { email, password } = body;
+        const { email, password, requiredRole } = body;
 
         if (!email || !password) {
             return NextResponse.json({ error: 'Missing credentials' }, { status: 400 });
@@ -20,6 +20,17 @@ export async function POST(request: Request) {
         const isValidPassword = await bcrypt.compare(password, user.password);
         if (!isValidPassword) {
             return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+        }
+
+        // ✅ RBAC: Enforce role-based portal access
+        if (requiredRole && user.role !== requiredRole) {
+            const portalName = requiredRole === 'FARMER' ? 'Farmer' : 'Consumer';
+            const correctPortal = user.role === 'FARMER' ? '/farmer/login' : '/consumer/login';
+            return NextResponse.json({
+                error: `Access denied. This is the ${portalName} portal. Please use the ${user.role === 'FARMER' ? 'Farmer' : 'Consumer'} portal to login.`,
+                correctPortal,
+                userRole: user.role
+            }, { status: 403 });
         }
 
         // Login

@@ -24,12 +24,13 @@ export async function DELETE(
             return NextResponse.json({ error: 'Crop not found' }, { status: 404 });
         }
 
-        if (crop.farmerId !== session.id) {
+        console.log(`DELETE Crop: Session ID=${session.id}, Crop FarmerID=${crop.farmerId}`);
+
+        if (String(crop.farmerId) !== String(session.id)) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
         // FORCE DELETE: Transaction to remove related items first
-        // This solves the "Foreign Key Constraint" error
         try {
             await prisma.$transaction([
                 // 1. Delete associated OrderItems
@@ -78,7 +79,7 @@ export async function PATCH(
             return NextResponse.json({ error: 'Crop not found' }, { status: 404 });
         }
 
-        if (crop.farmerId !== session.id) {
+        if (String(crop.farmerId) !== String(session.id)) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
@@ -88,10 +89,19 @@ export async function PATCH(
         if (quantityKg !== undefined) updateData.quantityKg = parseFloat(quantityKg);
         if (basePrice !== undefined) updateData.basePrice = parseFloat(basePrice);
 
-        await prisma.crop.update({
+        const updatedCrop = await prisma.crop.update({
             where: { id },
             data: updateData
         });
+
+        // Auto-delete if quantity is set to 0 or below
+        if (updatedCrop.quantityKg <= 0) {
+            await prisma.$transaction([
+                prisma.orderItem.deleteMany({ where: { cropId: id } }),
+                prisma.crop.delete({ where: { id } })
+            ]);
+            return NextResponse.json({ success: true, message: 'Crop was out of stock and has been removed.' });
+        }
 
         return NextResponse.json({ success: true, message: 'Crop updated successfully' });
     } catch (error) {
