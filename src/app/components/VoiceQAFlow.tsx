@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Mic, RefreshCw, Volume2, Sparkles, Loader2, CheckCircle, TrendingUp, AlertTriangle, Edit3 } from 'lucide-react';
+import { Mic, RefreshCw, Sparkles, Loader2, CheckCircle, TrendingUp, AlertTriangle, Edit3, IndianRupee } from 'lucide-react';
 import { useVoiceInput, Language } from '../hooks/useVoiceInput';
 import { processAiConversation } from '../utils/aiAssistant';
 
@@ -11,23 +11,23 @@ interface CropData {
 
 interface VoiceQAFlowProps {
     onComplete: (data: CropData) => void;
+    language?: Language;
+    onLanguageChange?: (language: Language) => void;
 }
 
-export default function VoiceQAFlow({ onComplete }: VoiceQAFlowProps) {
-    const [currentLang, setCurrentLang] = useState<Language>('ta-IN');
+export default function VoiceQAFlow({ onComplete, language = 'ta-IN', onLanguageChange }: VoiceQAFlowProps) {
+    const currentLang = language;
     const [isAiProcessing, setIsAiProcessing] = useState(false);
     const [hasStarted, setHasStarted] = useState(false);
     const [aiStatus, setAiStatus] = useState<string>('');
     const [priceReason, setPriceReason] = useState<string | null>(null);
     const [answers, setAnswers] = useState<CropData>({ name: '', quantityKg: '', basePrice: '' });
 
-    // ✅ NEW: Confirmation modal state
     const [showConfirm, setShowConfirm] = useState(false);
     const [confirmData, setConfirmData] = useState<CropData>({ name: '', quantityKg: '', basePrice: '' });
 
     const { isListening, isSpeaking, transcript, error, startListening, stopListening, resetTranscript, speak } = useVoiceInput(currentLang);
 
-    // Initial greeting
     const handleStart = useCallback(async () => {
         setHasStarted(true);
         setShowConfirm(false);
@@ -43,7 +43,6 @@ export default function VoiceQAFlow({ onComplete }: VoiceQAFlowProps) {
         speak(welcomeText, () => startListening());
     }, [currentLang, resetTranscript, speak, startListening]);
 
-    // Main AI interaction
     const handleAiInteraction = useCallback(async (text: string) => {
         if (!text || text.trim().length < 2) return;
 
@@ -53,7 +52,6 @@ export default function VoiceQAFlow({ onComplete }: VoiceQAFlowProps) {
         const response = await processAiConversation(text, answers, currentLang);
         setIsAiProcessing(false);
 
-        // Update answers with extracted data
         const newAnswers: CropData = {
             name: response.extractedData.name || answers.name,
             quantityKg: response.extractedData.quantityKg || answers.quantityKg,
@@ -61,7 +59,6 @@ export default function VoiceQAFlow({ onComplete }: VoiceQAFlowProps) {
         };
         setAnswers(newAnswers);
 
-        // Save price reason if AI provided one
         if (response.priceReason) setPriceReason(response.priceReason);
 
         resetTranscript();
@@ -69,7 +66,6 @@ export default function VoiceQAFlow({ onComplete }: VoiceQAFlowProps) {
 
         speak(response.message, () => {
             if (response.isComplete) {
-                // ✅ Show confirmation dialog instead of immediately submitting
                 setShowConfirm(true);
                 setConfirmData(newAnswers);
                 stopListening();
@@ -79,25 +75,23 @@ export default function VoiceQAFlow({ onComplete }: VoiceQAFlowProps) {
         });
     }, [answers, currentLang, resetTranscript, speak, startListening, stopListening]);
 
-    // Trigger AI when user stops speaking
     useEffect(() => {
         if (!isListening && transcript && !isSpeaking && hasStarted && !isAiProcessing) {
             handleAiInteraction(transcript);
         }
     }, [isListening, transcript, isSpeaking, hasStarted, isAiProcessing, handleAiInteraction]);
 
-    // Gentle retry prompt when no speech detected
     useEffect(() => {
         if (!isListening && !transcript && !isSpeaking && hasStarted && !isAiProcessing && !showConfirm) {
             const retryMsg = currentLang === 'ta-IN'
                 ? 'சரியா கேக்கலீங்க... மறுபடியும் தட்டி சொல்லுங்க.'
                 : "Didn't catch that. Tap to speak again.";
-            setAiStatus(prev => prev === retryMsg ? prev : retryMsg);
+            setAiStatus((prev) => prev === retryMsg ? prev : retryMsg);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isListening, isSpeaking]);
 
-    const handleManualRestart = () => {
+    const handleManualRestart = useCallback(() => {
         setHasStarted(false);
         setShowConfirm(false);
         setAnswers({ name: '', quantityKg: '', basePrice: '' });
@@ -105,23 +99,20 @@ export default function VoiceQAFlow({ onComplete }: VoiceQAFlowProps) {
         setAiStatus('');
         resetTranscript();
         stopListening();
-    };
+    }, [resetTranscript, stopListening]);
 
-    const toggleLanguage = () => {
-        setCurrentLang(currentLang === 'ta-IN' ? 'en-IN' : 'ta-IN');
+    useEffect(() => {
         handleManualRestart();
-    };
+    }, [currentLang, handleManualRestart]);
 
-    // ✅ Farmer confirms and submits
     const handleConfirmSubmit = () => {
         onComplete(confirmData);
         setShowConfirm(false);
     };
 
-    // ✅ Farmer edits and re-speaks
     const handleGoBack = () => {
         setShowConfirm(false);
-        setAnswers(confirmData); // keep edited values
+        setAnswers(confirmData);
         const reaskText = currentLang === 'ta-IN'
             ? 'சரிங்க, என்ன மாத்தணும்னு சொல்லுங்க.'
             : 'OK, tell me what to change.';
@@ -131,7 +122,6 @@ export default function VoiceQAFlow({ onComplete }: VoiceQAFlowProps) {
 
     const progress = (answers.name ? 33.3 : 0) + (answers.quantityKg ? 33.3 : 0) + (answers.basePrice ? 33.4 : 0);
 
-    // ========== CONFIRMATION MODAL (BRIGHT GREEN & WHITE) ==========
     if (showConfirm) {
         return (
             <div className="w-full max-w-xl mx-auto">
@@ -146,7 +136,7 @@ export default function VoiceQAFlow({ onComplete }: VoiceQAFlowProps) {
                             {currentLang === 'ta-IN' ? 'விவரங்களை சரிபார்க்கவும்' : 'Review & Confirm'}
                         </h2>
                         <p className="text-slate-500 text-sm">
-                            {currentLang === 'ta-IN' ? 'எல்லாம் சரியா இருந்தா சேர்க்கலாம்' : 'Edit details below, then hit confirm to add'}
+                            {currentLang === 'ta-IN' ? 'விவரங்கள் சரியா இருந்தா உறுதிப்படுத்துங்க' : 'Review details, edit if needed, then confirm to upload'}
                         </p>
                     </div>
 
@@ -158,7 +148,7 @@ export default function VoiceQAFlow({ onComplete }: VoiceQAFlowProps) {
                                 </label>
                                 <input
                                     value={confirmData.name}
-                                    onChange={e => setConfirmData(p => ({ ...p, name: e.target.value }))}
+                                    onChange={(e) => setConfirmData((p) => ({ ...p, name: e.target.value }))}
                                     className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-slate-800 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none capitalize transition-all shadow-sm"
                                 />
                             </div>
@@ -171,18 +161,18 @@ export default function VoiceQAFlow({ onComplete }: VoiceQAFlowProps) {
                                     <input
                                         type="number"
                                         value={confirmData.quantityKg}
-                                        onChange={e => setConfirmData(p => ({ ...p, quantityKg: e.target.value }))}
+                                        onChange={(e) => setConfirmData((p) => ({ ...p, quantityKg: e.target.value }))}
                                         className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all shadow-sm"
                                     />
                                 </div>
                                 <div>
                                     <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                                        {currentLang === 'ta-IN' ? 'விலை (Price)' : 'Price (₹/kg)'}
+                                        {currentLang === 'ta-IN' ? 'விலை (Price)' : 'Price (/kg)'}
                                     </label>
                                     <input
                                         type="number"
                                         value={confirmData.basePrice}
-                                        onChange={e => setConfirmData(p => ({ ...p, basePrice: e.target.value }))}
+                                        onChange={(e) => setConfirmData((p) => ({ ...p, basePrice: e.target.value }))}
                                         className="w-full p-3.5 bg-white border border-slate-200 rounded-xl font-bold text-emerald-600 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none transition-all shadow-sm"
                                     />
                                 </div>
@@ -204,13 +194,16 @@ export default function VoiceQAFlow({ onComplete }: VoiceQAFlowProps) {
                                 <p className="text-xs text-emerald-600/80 font-bold uppercase tracking-wider mb-1">
                                     {currentLang === 'ta-IN' ? 'மதிப்பீடு' : 'Total Value'}
                                 </p>
-                                <p className="text-xs text-emerald-700/60 font-medium">
-                                    {confirmData.quantityKg} kg × ₹{confirmData.basePrice}/kg
+                                <p className="text-xs text-emerald-700/60 font-medium flex items-center gap-1">
+                                    {confirmData.quantityKg} kg × <IndianRupee size={14} className="text-emerald-600" />{confirmData.basePrice}/kg
                                 </p>
                             </div>
-                            <p className="text-3xl font-black text-emerald-600">
-                                ₹{((parseFloat(confirmData.quantityKg) || 0) * (parseFloat(confirmData.basePrice) || 0)).toLocaleString()}
-                            </p>
+                            <div className="flex items-center gap-1.5">
+                                <IndianRupee size={28} className="text-emerald-600" />
+                                <p className="text-3xl font-black text-emerald-600">
+                                    {((parseFloat(confirmData.quantityKg) || 0) * (parseFloat(confirmData.basePrice) || 0)).toLocaleString()}
+                                </p>
+                            </div>
                         </div>
                     </div>
 
@@ -231,7 +224,7 @@ export default function VoiceQAFlow({ onComplete }: VoiceQAFlowProps) {
                             {currentLang === 'ta-IN' ? 'பயிரை சேர்க்கவும்' : 'Confirm & Upload'}
                         </button>
                     </div>
-                    
+
                     <button onClick={handleManualRestart} className="mt-1 text-xs font-semibold text-slate-400 hover:text-slate-600 transition-colors py-2">
                         {currentLang === 'ta-IN' ? 'ரத்து செய்ய' : 'Cancel & Reset'}
                     </button>
@@ -240,204 +233,152 @@ export default function VoiceQAFlow({ onComplete }: VoiceQAFlowProps) {
         );
     }
 
-    // ========== VOICE INTERACTION UI (BRIGHT & FRESH) ==========
     return (
-        <div className="w-full max-w-2xl mx-auto">
-            <div className="bg-white rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-emerald-50 flex flex-col items-center min-h-[550px] relative overflow-hidden">
-                
-                {/* Immersive background glow (Soft Emerald) */}
-                <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full blur-[100px] transition-all duration-[3000ms] pointer-events-none z-0
-                    ${isListening ? 'bg-rose-100 scale-125 opacity-70' : 
-                      isSpeaking ? 'bg-indigo-100 scale-150 opacity-70' : 
-                      isAiProcessing ? 'bg-emerald-100 scale-110 opacity-70' : 'bg-emerald-50/50'}`} 
-                />
-
-                {/* Header */}
-                <div className="w-full flex justify-between items-center z-10 p-6 pb-2">
-                    <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100">
-                        <Sparkles size={16} className={isAiProcessing ? "animate-spin text-emerald-500" : "text-emerald-500"} />
-                        <span className="text-[10px] font-black uppercase tracking-[0.15em]">FarmDirect AI</span>
-                    </div>
-                    <button 
-                        onClick={toggleLanguage} 
-                        className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all shadow-sm"
-                    >
-                        {currentLang === 'ta-IN' ? 'EN / தமிழ்' : 'TA / English'}
-                    </button>
-                </div>
-
-                {/* Visualizer Area */}
-                <div className="flex-1 flex flex-col items-center justify-center w-full relative z-10 px-6 py-4">
-                    {!hasStarted ? (
-                        <div className="flex flex-col items-center gap-8 w-full animate-in fade-in zoom-in-95 duration-500">
-                            <button 
-                                onClick={handleStart} 
-                                className="group relative w-36 h-36 rounded-full flex items-center justify-center transition-all hover:scale-105 active:scale-95"
-                            >
-                                <div className="absolute inset-0 bg-emerald-400 rounded-full blur-xl opacity-30 group-hover:opacity-50 transition-opacity animate-pulse" />
-                                <div className="absolute inset-0 bg-emerald-50 rounded-full border-4 border-emerald-100 scale-110" />
-                                <div className="relative w-full h-full rounded-full bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center text-white border-2 border-white shadow-xl">
-                                    <Mic size={52} strokeWidth={2.5} className="drop-shadow-md" />
+        <div className="w-full max-w-5xl mx-auto">
+            <div className="rounded-[28px] border border-emerald-200 bg-gradient-to-br from-white via-white to-emerald-50/30 text-gray-900 overflow-hidden shadow-[0_16px_48px_rgba(16,185,129,0.1)] relative">
+                <div className="relative z-10 p-6 md:p-8">
+                    <section className="rounded-2xl border border-emerald-200 bg-white p-6 space-y-5 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-emerald-100">
+                            <h3 className="text-lg font-black tracking-tight text-gray-900">{currentLang === 'ta-IN' ? 'குரல் தொடர்பு' : 'Voice Interaction'}</h3>
+                            <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-black">
+                                <div className="flex items-center gap-1 bg-white border-2 border-emerald-200 rounded-lg p-1">
+                                    <button
+                                        onClick={() => onLanguageChange?.('en-IN')}
+                                        className={`px-2.5 py-1 rounded-md text-[10px] font-black transition-all ${
+                                            currentLang === 'en-IN'
+                                                ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                                : 'bg-white text-gray-600 border border-transparent hover:border-emerald-200'
+                                        }`}
+                                    >
+                                        EN
+                                    </button>
+                                    <span className="text-gray-300 text-[10px]">/</span>
+                                    <button
+                                        onClick={() => onLanguageChange?.('ta-IN')}
+                                        className={`px-2.5 py-1 rounded-md text-[10px] font-black transition-all ${
+                                            currentLang === 'ta-IN'
+                                                ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                                                : 'bg-white text-gray-600 border border-transparent hover:border-emerald-200'
+                                        }`}
+                                    >
+                                        தமிழ்
+                                    </button>
                                 </div>
-                            </button>
-                            
-                            <div className="text-center space-y-5">
-                                <div>
-                                    <h2 className="text-slate-800 text-3xl font-black mb-2 tracking-tight">
-                                        {currentLang === 'ta-IN' ? 'AI குரல் உதவியாளர்' : 'AI Voice Assistant'}
-                                    </h2>
-                                    <p className="text-slate-500 text-base font-medium">
-                                        {currentLang === 'ta-IN' ? 'பேசத் தொடங்க மைக் பட்டனை அழுத்தவும்' : 'Tap the mic to start speaking'}
-                                    </p>
-                                </div>
-                                <div className="bg-emerald-50/80 backdrop-blur-sm border border-emerald-100/80 p-5 rounded-2xl max-w-sm mx-auto shadow-sm">
-                                    <p className="text-emerald-700 text-sm font-semibold leading-relaxed">
-                                        {currentLang === 'ta-IN' 
-                                            ? '"பயிர் பெயர், அளவு, விலை கூறுங்கள். நான் பார்த்துக்கொள்கிறேன்!"'
-                                            : '"Just say your crop name, quantity, and price. I will do the rest!"'}
-                                    </p>
-                                </div>
+                                <span className={`px-3 py-1.5 rounded-full border-2 flex items-center gap-1.5 transition-all ${isListening ? 'border-emerald-500 text-emerald-600 bg-emerald-100' : 'border-gray-300 text-gray-500 bg-gray-50'}`}>
+                                    {isListening ? <Mic size={14} className="animate-pulse" /> : <AlertTriangle size={14} />}
+                                    {isListening ? (currentLang === 'ta-IN' ? 'கேட்கிறேன்' : 'Listening') : (currentLang === 'ta-IN' ? 'நிறுத்தம்' : 'Idle')}
+                                </span>
+                                <span className={`px-3 py-1.5 rounded-full border-2 flex items-center gap-1.5 transition-all ${isSpeaking ? 'border-emerald-500 text-emerald-600 bg-emerald-100' : 'border-gray-300 text-gray-500 bg-gray-50'}`}>
+                                    {isSpeaking ? <Sparkles size={14} className="animate-spin" /> : <AlertTriangle size={14} />}
+                                    {isSpeaking ? (currentLang === 'ta-IN' ? 'பதில்' : 'Speaking') : (currentLang === 'ta-IN' ? 'மௌனம்' : 'Silent')}
+                                </span>
                             </div>
                         </div>
-                    ) : (
-                        <div className="flex flex-col items-center gap-10 w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            <div 
-                                className="relative cursor-pointer group flex items-center justify-center mt-2 w-48 h-48"
-                                onClick={() => !isSpeaking && !isListening && !isAiProcessing && startListening()}
-                            >
-                                {/* Audio wave simulation rings - Lighter colors for white theme */}
-                                {isSpeaking && (
-                                    <>
-                                        <div className="absolute inset-4 border-[3px] border-indigo-200 rounded-full animate-[ping_1.5s_cubic-bezier(0,0,0.2,1)_infinite]" />
-                                        <div className="absolute inset-4 border-[3px] border-indigo-100 rounded-full animate-[ping_2s_cubic-bezier(0,0,0.2,1)_infinite_0.5s]" />
-                                    </>
-                                )}
-                                {isListening && (
-                                    <div className="absolute inset-4 border-[3px] border-rose-200 rounded-full animate-[ping_1.5s_ease-out_infinite]" />
-                                )}
-                                {isAiProcessing && (
-                                    <div className="absolute inset-2 border-[4px] border-emerald-100 border-t-emerald-400 rounded-full animate-spin" />
-                                )}
 
-                                {/* Main Orb */}
-                                <div className={`relative w-32 h-32 rounded-full flex items-center justify-center transition-all duration-700 overflow-hidden
-                                    ${isListening ? 'bg-gradient-to-br from-rose-400 to-red-500 shadow-[0_10px_40px_rgba(225,29,72,0.3)] scale-110 border-4 border-white' :
-                                      isSpeaking ? 'bg-gradient-to-tr from-indigo-400 to-violet-500 shadow-[0_10px_40px_rgba(79,70,229,0.3)] scale-105 border-4 border-white' :
-                                      isAiProcessing ? 'bg-gradient-to-bl from-emerald-400 to-teal-500 shadow-[0_10px_40px_rgba(16,185,129,0.3)]' :
-                                      'bg-white border-[6px] border-emerald-50 shadow-xl hover:shadow-2xl hover:border-emerald-100 hover:scale-105 group-hover:bg-emerald-50 transition-all'}`}
-                                >
-                                    <div className="relative z-10 w-full h-full flex items-center justify-center">
-                                        {isAiProcessing ? (
-                                            <Sparkles size={40} className="text-white animate-pulse" />
-                                        ) : isSpeaking ? (
-                                            <div className="flex gap-1.5 items-center justify-center h-12 w-16">
-                                                {[1, 2, 3, 4, 5].map(i => (
-                                                    <div key={i} className="w-1.5 bg-white rounded-full animate-[pulse_1s_ease-in-out_infinite]"
-                                                        style={{ height: `${20 + Math.random() * 80}%`, animationDelay: `${i * 0.1}s` }} />
-                                                ))}
-                                            </div>
-                                        ) : isListening ? (
-                                            <div className="relative flex items-center justify-center">
-                                                <div className="absolute inset-0 bg-white/30 rounded-full blur-md animate-pulse" />
-                                                <Mic size={44} className="text-white drop-shadow-sm" />
-                                            </div>
-                                        ) : (
-                                            <Mic size={44} className="text-emerald-400 group-hover:text-emerald-500 transition-colors" />
-                                        )}
-                                    </div>
+                        {!hasStarted ? (
+                            <div className="space-y-4 pt-2">
+                                <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-5 text-sm text-gray-700 leading-relaxed flex items-start gap-3">
+                                    <Sparkles size={18} className="text-emerald-600 mt-1 shrink-0" />
+                                    <span className="font-medium">
+                                        {currentLang === 'ta-IN'
+                                            ? 'தொடங்கு பொத்தை தட்டுங்க. பிறகு பயிர் பெயர், அளவு, விலை சொன்னா போதும்.'
+                                            : 'Tap Start button, then say crop name, quantity, and price one after another.'}
+                                    </span>
                                 </div>
+                                <button
+                                    onClick={handleStart}
+                                    className="w-full h-16 rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white font-black uppercase tracking-widest transition-all hover:shadow-lg hover:shadow-emerald-500/30 active:scale-95 flex items-center justify-center gap-2.5 shadow-md"
+                                >
+                                    <Mic size={20} />
+                                    {currentLang === 'ta-IN' ? 'தொடங்கு' : 'Start Session'}
+                                </button>
                             </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <button
+                                    onClick={() => !isSpeaking && !isListening && !isAiProcessing && startListening()}
+                                    className={`w-full h-28 rounded-2xl border-2 transition-all flex items-center justify-center gap-3 font-black tracking-wide ${
+                                        isListening
+                                            ? 'bg-emerald-100 border-emerald-500 text-emerald-700 shadow-lg shadow-emerald-500/30'
+                                            : isSpeaking
+                                                ? 'bg-emerald-50 border-emerald-400 text-emerald-600 shadow-md'
+                                                : isAiProcessing
+                                                    ? 'bg-amber-50 border-amber-300 text-amber-700 shadow-md'
+                                                    : 'bg-white border-emerald-200 text-gray-900 hover:bg-emerald-50 hover:shadow-md active:scale-95'
+                                    }`}
+                                >
+                                    {isAiProcessing ? <Loader2 size={26} className="animate-spin text-amber-600" /> : <Mic size={26} className={isListening ? 'text-emerald-600 animate-pulse' : ''} />}
+                                    <div className="text-left">
+                                        <div className="text-sm">
+                                            {isListening
+                                                ? (currentLang === 'ta-IN' ? 'குரல் கேட்கிறது...' : 'Listening...')
+                                                : isSpeaking
+                                                    ? (currentLang === 'ta-IN' ? 'AI பேசுகிறது...' : 'AI speaking...')
+                                                    : isAiProcessing
+                                                        ? (currentLang === 'ta-IN' ? 'செயலாக்கம்...' : 'Processing...')
+                                                        : (currentLang === 'ta-IN' ? 'மீண்டும் பேச தட்டவும்' : 'Tap to speak')}
+                                        </div>
+                                    </div>
+                                </button>
 
-                            <div className="w-full text-center space-y-3 h-[100px] flex flex-col justify-center max-w-sm">
                                 {error ? (
-                                    <div className="bg-rose-50 border border-rose-200 py-3 px-5 rounded-2xl inline-flex items-center gap-2 text-rose-600 mx-auto shadow-sm">
-                                        <AlertTriangle size={16} />
-                                        <span className="text-sm font-bold">{error}</span>
-                                        <button onClick={() => startListening()} className="text-rose-500 ml-3 font-black text-xs uppercase hover:underline">Retry</button>
+                                    <div className="rounded-xl border-2 border-red-200 bg-red-50 p-4 text-red-700 text-sm flex items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2.5">
+                                            <AlertTriangle size={18} className="shrink-0" />
+                                            <span className="font-semibold">{error}</span>
+                                        </div>
+                                        <button onClick={() => startListening()} className="text-xs font-black uppercase tracking-wider text-red-600 hover:text-red-700 bg-red-100 px-3 py-1.5 rounded-lg hover:bg-red-200 transition-colors">Retry</button>
                                     </div>
                                 ) : (
-                                    <div className="animate-in fade-in duration-300">
-                                        <p className={`text-xl font-bold transition-colors ${isSpeaking ? 'text-indigo-600' : isListening ? 'text-rose-600' : isAiProcessing ? 'text-emerald-600' : 'text-slate-600'} italic`}>
-                                            {aiStatus || (isListening ? (transcript || '...') : (currentLang === 'ta-IN' ? 'பேசத் தட்டவும்...' : 'Tap to speak...'))}
+                                    <div className="rounded-2xl border-2 border-emerald-200 bg-emerald-50 p-5 min-h-[140px] space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <Sparkles size={16} className="text-emerald-600" />
+                                            <p className="text-xs uppercase tracking-widest text-emerald-600 font-black">AI Response</p>
+                                        </div>
+                                        <p className="text-sm leading-relaxed text-gray-800 font-medium">
+                                            {aiStatus || (currentLang === 'ta-IN' ? 'குரல் துவங்க தயார்.' : 'Ready for voice input.')}
                                         </p>
                                         {isListening && transcript && (
-                                            <div className="mt-3 bg-white/60 backdrop-blur-sm px-4 py-2 rounded-xl inline-block border border-slate-100 shadow-sm">
-                                                <p className="text-slate-600 text-sm font-medium">"{transcript}"</p>
-                                            </div>
+                                            <p className="text-sm text-emerald-700 border-l-4 border-emerald-500 pl-4 italic">"{transcript}"</p>
                                         )}
                                     </div>
                                 )}
                             </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Dashboard Dock - Light Theme Edition */}
-                <div className={`w-full bg-white/80 backdrop-blur-xl border-t border-slate-100 p-5 rounded-b-[2rem] z-10 transition-all duration-700 transform relative ${hasStarted ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0 pointer-events-none'}`}>
-                    
-                    {/* Shadow overlay separating top and bottom */}
-                    <div className="absolute top-[-20px] left-0 right-0 h-5 bg-gradient-to-b from-transparent to-slate-900/[0.02]" />
-
-                    <div className="flex items-center justify-between mb-4">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                            {currentLang === 'ta-IN' ? 'தற்போதைய தரவு' : 'Live Data Extraction'}
-                        </span>
-                        {progress > 0 && (
-                            <div className="flex items-center gap-2 bg-emerald-50 px-2 py-1 rounded-full">
-                                <span className="text-[10px] font-bold text-emerald-600">{Math.round(progress)}% Extracted</span>
-                            </div>
                         )}
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-3">
-                        <LightDataCard 
-                            label={currentLang === 'ta-IN' ? 'பயிர் / Crop' : 'Crop'} 
-                            value={answers.name} 
-                            placeholder="---"
-                        />
-                        <LightDataCard 
-                            label={currentLang === 'ta-IN' ? 'அளவு (kg)' : 'Qty (kg)'} 
-                            value={answers.quantityKg} 
-                            placeholder="---"
-                        />
-                        <LightDataCard 
-                            label={currentLang === 'ta-IN' ? 'விலை (₹)' : 'Price'} 
-                            value={answers.basePrice} 
-                            prefix="₹" 
-                            placeholder="---"
-                        />
-                    </div>
 
-                    <div className="flex justify-between items-center mt-5 pt-1">
-                        <button onClick={handleManualRestart} className="flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-slate-600 transition-colors bg-slate-50 hover:bg-slate-100 px-4 py-2 rounded-full border border-slate-100 group">
-                            <RefreshCw size={14} className="group-hover:-rotate-90 transition-transform duration-300" />
-                            {currentLang === 'ta-IN' ? 'ரீசெட்' : 'Reset'}
-                        </button>
-
-                        {isListening && (
-                            <button onClick={stopListening} className="bg-rose-50 text-rose-500 hover:bg-rose-100 px-5 py-2 rounded-full text-xs font-bold transition-colors flex items-center gap-2 border border-rose-100 shadow-sm">
-                                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
-                                Stop Listening
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-emerald-100">
+                            <button onClick={handleManualRestart} className="px-5 py-2.5 rounded-lg border-2 border-emerald-200 bg-white hover:bg-emerald-50 text-emerald-600 text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-all hover:border-emerald-300 hover:shadow-md">
+                                <RefreshCw size={15} />
+                                {currentLang === 'ta-IN' ? 'ரீசெட்' : 'Reset'}
                             </button>
-                        )}
-                    </div>
+                            {isListening && (
+                                <button onClick={stopListening} className="px-5 py-2.5 rounded-lg border-2 border-emerald-300 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 text-xs font-black uppercase tracking-wider transition-all hover:shadow-md active:scale-95">
+                                    {currentLang === 'ta-IN' ? 'கேட்குவது நிறுத்து' : 'Stop Listening'}
+                                </button>
+                            )}
+                        </div>
+                    </section>
                 </div>
-
             </div>
         </div>
     );
 }
 
-function LightDataCard({ label, value, prefix = '', placeholder = '' }: { label: string, value: string, prefix?: string, placeholder?: string }) {
+function LightDataCard({ label, value, placeholder = '', showIcon = false }: { label: string, value: string, placeholder?: string, showIcon?: boolean }) {
+    const hasValue = Boolean(value);
+
     return (
-        <div className={`px-4 py-3 rounded-2xl border transition-all duration-300 flex flex-col justify-center items-center text-center ${value ? 'bg-emerald-50/50 border-emerald-100 shadow-[inset_0_0_20px_rgba(16,185,129,0.02)]' : 'bg-slate-50 border-transparent border-slate-100'}`}>
-            <span className={`text-[9px] uppercase tracking-wider font-bold mb-1.5 block truncate ${value ? 'text-emerald-500' : 'text-slate-400'}`}>
-                {label}
-            </span>
-            <span className={`text-xl font-black truncate w-full ${value ? 'text-slate-700' : 'text-slate-300'}`}>
-                {value ? `${prefix}${value}` : placeholder}
-            </span>
+        <div className={`rounded-xl border-2 px-4 py-3.5 transition-all ${hasValue ? 'border-emerald-200 bg-emerald-50 shadow-sm' : 'border-gray-200 bg-white'}`}>
+            <div className="flex items-center gap-2 mb-1.5">
+                {hasValue ? <CheckCircle size={14} className="text-emerald-600" /> : <AlertTriangle size={14} className="text-gray-400" />}
+                <p className={`text-[10px] uppercase tracking-wider font-bold ${hasValue ? 'text-emerald-600' : 'text-gray-500'}`}>
+                    {label}
+                </p>
+            </div>
+            <div className="flex items-center gap-1">
+                {showIcon && hasValue && <IndianRupee size={14} className="text-emerald-700" />}
+                <p className={`text-base font-black truncate ${hasValue ? 'text-emerald-700' : 'text-gray-400'}`}>{hasValue ? value : placeholder}</p>
+            </div>
         </div>
     );
 }

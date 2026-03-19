@@ -4,7 +4,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import VoiceQAFlow from '@/app/components/VoiceQAFlow';
 import PriceInsightsChart from '@/app/components/PriceInsightsChart';
 import { Button } from '@/app/components/ui/Button';
-import { Package, Truck, CheckCircle, Clock, Volume2, Trash2, Pencil, Sparkles, MessageSquare, MapPin, TrendingUp, Leaf, Star } from 'lucide-react';
+import { Language } from '@/app/hooks/useVoiceInput';
+import { Package, Truck, CheckCircle, Clock, Volume2, Trash2, Pencil, Sparkles, MessageSquare, MapPin, TrendingUp, Leaf, Star, LogOut, Mic } from 'lucide-react';
 import { fetchWithAuth } from '@/lib/clientAuth';
 
 interface Crop {
@@ -362,520 +363,510 @@ export default function FarmerDashboard() {
     // Tab State
     const [activeTab, setActiveTab] = useState<'orders' | 'add' | 'listings' | 'inquiries' | 'prices' | 'reviews'>('orders');
     const [addMode, setAddMode] = useState<'voice' | 'manual'>('voice');
+    const [voiceLanguage, setVoiceLanguage] = useState<Language>('ta-IN');
 
     // ... (rest of existing state and logic remains, I will just re-render the return)
 
     // Calculate Sales Stats
     const totalSales = orders.reduce((sum, order) => sum + order.totalAmount, 0);
+    const deliveredOrders = orders.filter((order) => order.status === 'DELIVERED').length;
+    const averageRating = reviews.length > 0
+        ? (reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length).toFixed(1)
+        : '0.0';
+
+    const getStatusTamil = (status: string) => {
+        if (status === 'PLACED') return 'புதிய ஆர்டர்';
+        if (status === 'ACCEPTED') return 'ஏற்றுக்கொள்ளப்பட்டது';
+        if (status === 'OUT_FOR_DELIVERY') return 'விநியோகத்தில்';
+        if (status === 'DELIVERED') return 'வழங்கப்பட்டது';
+        return status;
+    };
+
+    const tabs: Array<{
+        id: 'orders' | 'add' | 'listings' | 'inquiries' | 'prices' | 'reviews';
+        label: string;
+        subtitle: string;
+        icon: typeof Truck;
+        badge?: number;
+    }> = [
+        { id: 'orders', label: 'ஆர்டர் மையம்', subtitle: 'நிலை & செயல்கள்', icon: Truck, badge: orders.filter((o) => o.status !== 'DELIVERED').length },
+        { id: 'add', label: 'பயிர் சேர்க்க', subtitle: 'குரல் அல்லது படிவம்', icon: Sparkles },
+        { id: 'listings', label: 'நேரடி பட்டியல்', subtitle: 'சரக்கு பலகை', icon: Package, badge: allCrops.length },
+        { id: 'inquiries', label: 'வாங்குபவர் பேசு', subtitle: 'விசாரணைகள்', icon: MessageSquare, badge: inquiries.length },
+        { id: 'prices', label: 'விலை ரேடார்', subtitle: 'சந்தை போக்கு', icon: TrendingUp },
+        { id: 'reviews', label: 'நம்பிக்கை மதிப்பு', subtitle: 'மதிப்புரைகள்', icon: Star, badge: reviews.length },
+    ];
 
     return (
-        <div className="min-h-screen bg-slate-50/50 font-sans text-slate-900 pb-20 selection:bg-emerald-100 selection:text-emerald-900">
+        <div className="min-h-screen bg-white font-sans text-slate-900 pb-20">
             {toast && (
-                <div className={`fixed top-8 left-1/2 -translate-x-1/2 z-[100] px-8 py-4 rounded-[28px] shadow-2xl backdrop-blur-md animate-in fade-in slide-in-from-top-4 duration-300 flex items-center gap-3 border ${toast.type === 'success' ? 'bg-white/90 border-emerald-100 text-emerald-900' : 'bg-red-50/90 border-red-100 text-red-900'}`}>
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>
-                        {toast.type === 'success' ? <CheckCircle size={18} /> : <Trash2 size={18} />}
-                    </div>
-                    <p className="font-black text-sm uppercase tracking-widest">{toast.message}</p>
+                <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-2xl shadow-xl animate-in fade-in slide-in-from-top-4 duration-300 flex items-center gap-3 border ${
+                    toast.type === 'success' ? 'bg-emerald-600 border-emerald-700 text-white' : 'bg-red-500 border-red-600 text-white'
+                }`}>
+                    {toast.type === 'success' ? <CheckCircle size={16} /> : <Trash2 size={16} />}
+                    <p className="font-bold text-sm">{toast.message}</p>
                 </div>
             )}
-            {/* HEADER */}
-            <header className="sticky top-4 z-50 px-4 md:px-8">
-                <nav className="max-w-7xl mx-auto bg-white/80 backdrop-blur-xl border border-emerald-50 rounded-[40px] p-4 flex items-center justify-between shadow-2xl shadow-emerald-900/5">
-                    <div className="flex items-center gap-6 px-4">
-                        <div className="flex items-center gap-4 group">
-                            <div className="p-3 bg-emerald-600 rounded-2xl shadow-lg shadow-emerald-200 ring-2 ring-white group-hover:scale-110 transition-transform duration-500">
-                                <Leaf className="text-white" size={24} />
-                            </div>
-                            <div>
-                                <h1 className="text-2xl font-black text-slate-950 tracking-tighter leading-none">FarmDirect</h1>
-                                <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] opacity-80">Dashboard</span>
-                                    <span className="text-[10px] font-black text-slate-300 uppercase tracking-widest">|</span>
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">விவசாயி தளம்</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
 
+            {/* HEADER */}
+            <header className="bg-white border-b border-emerald-100 sticky top-0 z-50">
+                <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="hidden md:flex flex-col items-end mr-6">
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Pincode | அஞ்சல் குறியீடு</p>
-                            <div className="flex items-center gap-2 mt-1 bg-emerald-50/50 px-3 py-1 rounded-full border border-emerald-100/50">
-                                <MapPin size={12} className="text-emerald-600" />
-                                <span className="text-sm font-black text-slate-900 tracking-tight">{pincode}</span>
-                            </div>
+                        <div className="w-9 h-9 bg-emerald-600 rounded-xl flex items-center justify-center">
+                            <Leaf className="text-white" size={18} />
                         </div>
-                        <Button variant="ghost" className="h-14 w-14 rounded-full bg-slate-50 text-slate-400 hover:text-red-500 hover:bg-red-50 border border-slate-100 transition-all group" onClick={async () => {
-                            await fetch('/api/auth/logout', { method: 'POST' });
-                            window.location.href = '/';
-                        }}>
-                            <Trash2 size={24} className="group-hover:rotate-12 transition-transform" />
-                        </Button>
+                        <div>
+                            <span className="font-black text-lg text-slate-900 tracking-tight">FarmDirect</span>
+                            <span className="ml-2 text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Farmer</span>
+                        </div>
                     </div>
-                </nav>
+                    <div className="flex items-center gap-4">
+                        <div className="hidden md:flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-full">
+                            <MapPin size={12} className="text-emerald-600" />
+                            <span className="text-xs font-bold text-emerald-700">{pincode}</span>
+                        </div>
+                        {user && <span className="hidden md:block text-sm font-semibold text-slate-600">{user.name}</span>}
+                        <button onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/'; }}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-100 text-red-500 hover:bg-red-50 transition-colors text-sm font-bold">
+                            <LogOut size={15} />
+                            <span className="hidden md:inline">Logout</span>
+                        </button>
+                    </div>
+                </div>
             </header>
 
-            <main className="max-w-7xl mx-auto p-4 md:p-8 space-y-12 mt-4">
-                {/* Stats Summary */}
-                <section className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <main className="max-w-7xl mx-auto px-4 md:px-6 py-8 space-y-8">
+                {/* Stats */}
+                <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {[
-                        { label: 'Crops Listed', tamil: 'பட்டியல் பயிர்கள்', val: allCrops.length, icon: Leaf, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                        { label: 'Active Orders', tamil: 'செயலில் உள்ள ஆர்டர்கள்', val: orders.filter(o => o.status !== 'DELIVERED').length, icon: Truck, color: 'text-blue-600', bg: 'bg-blue-50' },
-                        { label: 'New Inquiries', tamil: 'புதிய விசாரணைகள்', val: inquiries.length, icon: MessageSquare, color: 'text-purple-600', bg: 'bg-purple-50' },
-                        { label: 'Total Earnings', tamil: 'மொத்த வருமானம்', val: `₹${totalSales.toLocaleString()}`, icon: TrendingUp, color: 'text-orange-600', bg: 'bg-orange-50' }
-                    ].map((stat, i) => (
-                        <div key={i} className="bg-white p-6 rounded-[32px] border border-emerald-50 shadow-sm hover:shadow-xl hover:shadow-emerald-900/5 transition-all group relative overflow-hidden">
-                            <div className={`absolute top-0 right-0 w-24 h-24 ${stat.bg} rounded-full -mr-12 -mt-12 opacity-50 group-hover:scale-110 transition-transform duration-500`} />
-                            <div className="relative z-10">
-                                <div className={`w-12 h-12 ${stat.bg} ${stat.color} rounded-2xl flex items-center justify-center mb-4 shadow-sm`}>
-                                    <stat.icon size={24} />
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
-                                    <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">{stat.tamil}</p>
-                                    <p className="text-2xl font-black text-slate-900 mt-2">{stat.val}</p>
-                                </div>
+                        { label: 'Crops Listed', sub: 'பட்டியல்', val: allCrops.length, icon: Leaf, accent: 'bg-emerald-600' },
+                        { label: 'Active Orders', sub: 'ஆர்டர்கள்', val: orders.filter(o => o.status !== 'DELIVERED').length, icon: Truck, accent: 'bg-emerald-500' },
+                        { label: 'Inquiries', sub: 'விசாரணை', val: inquiries.length, icon: MessageSquare, accent: 'bg-emerald-700' },
+                        { label: 'Total Earnings', sub: 'வருமானம்', val: `₹${totalSales.toLocaleString()}`, icon: TrendingUp, accent: 'bg-emerald-800' },
+                    ].map((s, i) => (
+                        <div key={i} className="bg-white border border-emerald-100 rounded-2xl p-5 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
+                            <div className={`w-11 h-11 ${s.accent} rounded-xl flex items-center justify-center shrink-0`}>
+                                <s.icon size={20} className="text-white" />
+                            </div>
+                            <div>
+                                <p className="text-xs text-slate-400 font-medium">{s.label}</p>
+                                <p className="text-xs text-emerald-600 font-medium">{s.sub}</p>
+                                <p className="text-xl font-black text-slate-900 mt-0.5">{s.val}</p>
                             </div>
                         </div>
                     ))}
                 </section>
 
-                {/* Navigation Tabs - Modern & Premium */}
-                <div className="bg-white p-2 rounded-3xl border border-emerald-50 shadow-sm grid grid-cols-6 gap-2 max-w-4xl mx-auto overflow-x-auto no-scrollbar">
-                    {[
-                        { id: 'orders', icon: Truck, label: 'Orders', ml: 'ஆர்டர்கள்' },
-                        { id: 'add', icon: Volume2, label: 'Add Crop', ml: 'பயிர்' },
-                        { id: 'listings', icon: Package, label: 'Listings', ml: 'பட்டியல்' },
-                        { id: 'inquiries', icon: MessageSquare, label: 'Inquiries', ml: 'விசாரணை', badge: inquiries.length },
-                        { id: 'reviews', icon: Star, label: 'Reviews', ml: 'மதிப்பீடு', badge: reviews.length },
-                        { id: 'prices', icon: TrendingUp, label: 'Prices', ml: 'விலைகள்' }
-                    ].map((tab) => {
-                        const Icon = tab.icon;
-                        const isActive = activeTab === tab.id;
-                        return (
-                            <button
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id as any)}
-                                className={`py-3 rounded-2xl text-xs font-black transition-all flex flex-col items-center justify-center gap-1.5 relative group ${isActive ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200 ring-4 ring-emerald-50' : 'text-slate-400 hover:bg-emerald-50 hover:text-emerald-600'}`}
-                            >
-                                <div className="relative">
-                                    <Icon size={20} className={isActive ? 'animate-pulse' : 'group-hover:scale-110 transition-transform'} />
-                                    {tab.badge && tab.badge > 0 && !isActive && (
-                                        <span className="absolute -top-1.5 -right-2.5 bg-red-500 text-white text-[8px] min-w-[14px] h-[14px] px-1 rounded-full flex items-center justify-center border-2 border-white">{tab.badge}</span>
-                                    )}
-                                </div>
-                                <div className="flex flex-col items-center leading-none">
-                                    <span className="hidden md:inline text-[10px] uppercase tracking-tighter">{tab.label}</span>
-                                    <span className="text-[9px] font-bold">{tab.ml}</span>
-                                </div>
-                            </button>
-                        );
-                    })}
-                </div>
-
-                {/* TAB 1: ORDERS */}
-                {activeTab === 'orders' && (
-                    <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <div className="flex justify-between items-end">
-                            <div>
-                                <h2 className="text-xl font-black text-slate-900 tracking-tight">Recent Orders</h2>
-                                <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest mt-0.5 ml-0.5">சமீபத்திய ஆர்டர்கள்</p>
-                            </div>
-                            <Button variant="ghost" size="sm" onClick={fetchData} className="text-emerald-600 font-black text-[11px] uppercase tracking-widest bg-emerald-50 px-4 rounded-xl border border-emerald-100 shadow-sm">
-                                <Clock size={14} className="mr-2" /> Refresh
-                            </Button>
+                {/* Dashboard Workspace */}
+                <section className="grid gap-5 lg:grid-cols-[260px_1fr]">
+                    <aside className="bg-gradient-to-b from-emerald-900 via-emerald-800 to-emerald-700 rounded-[28px] p-4 text-white shadow-xl shadow-emerald-900/20 sticky top-16 h-fit max-h-[calc(100vh-80px)] overflow-y-auto">
+                        <div className="px-2 pt-2 pb-5 border-b border-emerald-500/40">
+                            <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-100/80 font-black">விவசாயி கட்டுப்பாட்டு மையம்</p>
+                            <h3 className="text-lg font-black tracking-tight mt-2">வேலைப்பகுதி</h3>
+                            <p className="text-[10px] text-emerald-100/80 mt-1">பிரிவுகளை மாற்றவும்</p>
                         </div>
-
-                        {orders.length === 0 ? (
-                            <div className="text-center py-32 bg-white rounded-[40px] border-2 border-dashed border-emerald-100/50 flex flex-col items-center">
-                                <div className="bg-emerald-50/50 w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-inner ring-8 ring-emerald-50/20">
-                                    <Truck className="text-emerald-200" size={48} />
-                                </div>
-                                <h3 className="text-slate-900 text-lg font-black">No active orders yet</h3>
-                                <p className="text-emerald-600 font-bold text-xs uppercase tracking-widest mt-1">ஆர்டர்கள் எதுவும் இல்லை</p>
-                                <p className="text-slate-400 text-sm mt-4 max-w-xs mx-auto text-balance">Orders from consumers will appear here automatically when they buy your crops.</p>
-                            </div>
-                        ) : (
-                            <div className="grid gap-6 md:grid-cols-2">
-                                {orders.map(order => (
-                                    <div key={order.id} className="bg-white p-7 rounded-[32px] shadow-sm border border-emerald-50 hover:shadow-xl hover:shadow-emerald-900/5 transition-all group relative overflow-hidden">
-                                        {/* Status Accent Bar */}
-                                        <div className={`absolute top-0 left-0 w-2 h-full ${order.status === 'PLACED' ? 'bg-orange-400' : order.status === 'ACCEPTED' ? 'bg-blue-400' : order.status === 'OUT_FOR_DELIVERY' ? 'bg-purple-400' : 'bg-emerald-400'}`} />
-                                        
-                                        <div className="flex justify-between items-start mb-6">
-                                            <div>
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <span className="font-black text-[10px] bg-slate-100 px-2.5 py-1 rounded-lg text-slate-500 tracking-tighter">ID: #{order.id.slice(0, 8)}</span>
-                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new Date(order.createdAt).toLocaleDateString()}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <StatusIcon status={order.status} />
-                                                    <span className="font-black text-slate-900 uppercase tracking-tighter text-sm">{order.status.replace(/_/g, " ")}</span>
-                                                </div>
-                                                <div className="mt-2 flex items-center gap-2">
-                                                    <div className="w-6 h-6 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-[10px] font-black">
-                                                        {order.consumer?.name?.charAt(0).toUpperCase()}
-                                                    </div>
-                                                    <span className="text-xs font-black text-slate-700">Buyer: {order.consumer?.name}</span>
-                                                </div>
-                                            </div>
-                                            <Button variant="ghost" size="sm" onClick={() => speakOrder(order)} className="p-2.5 rounded-2xl bg-slate-50 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all border border-slate-100">
-                                                <Volume2 size={24} />
-                                            </Button>
-                                        </div>
-
-                                        <div className="space-y-4 mb-8">
-                                            {order.items?.map((item) => (
-                                                <div key={item.id} className="flex justify-between items-center py-3 border-b border-dashed border-slate-100 last:border-0 hover:bg-slate-50/50 px-2 rounded-xl transition-colors">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-slate-900 font-black text-sm capitalize">{item.crop?.name}</span>
-                                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Quantity: {item.quantity} kg</span>
-                                                    </div>
-                                                    <span className="font-black text-slate-900 text-lg">₹{item.price * item.quantity}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        <div className="flex items-end justify-between pt-6 border-t border-slate-100">
-                                            <div>
-                                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Items ₹{order.totalAmount} + Del ₹{order.deliveryCharge}</p>
-                                                <div className="flex items-baseline gap-1">
-                                                    <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total</p>
-                                                    <p className="text-3xl font-black text-slate-900 tracking-tighter">₹{order.totalAmount + order.deliveryCharge}</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                {order.status === 'PLACED' && <Button size="sm" onClick={() => updateStatus(order.id, 'ACCEPTED')} className="bg-blue-600 hover:bg-blue-700 text-white rounded-2xl px-5 flex flex-col h-12"><span>Accept</span><span className="text-[9px] font-bold opacity-80">ஏற்றுக்கொள்</span></Button>}
-                                                {order.status === 'ACCEPTED' && <Button size="sm" onClick={() => updateStatus(order.id, 'OUT_FOR_DELIVERY')} className="bg-purple-600 hover:bg-purple-700 text-white rounded-2xl px-5 flex flex-col h-12"><span>Dispatch</span><span className="text-[9px] font-bold opacity-80">அனுப்பு</span></Button>}
-                                                {order.status === 'OUT_FOR_DELIVERY' && <Button size="sm" onClick={() => updateStatus(order.id, 'DELIVERED')} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl px-5 flex flex-col h-12"><span>Delivered</span><span className="text-[9px] font-bold opacity-80">வழங்கப்பட்டது</span></Button>}
-                                            </div>
-                                        </div>
-
-                                        <div className="mt-6 bg-emerald-50/30 p-5 rounded-[24px] border border-emerald-50/50">
-                                            <div className="flex items-start gap-3 text-xs text-slate-600 mb-4">
-                                                <MapPin size={16} className="text-emerald-600 shrink-0 mt-0.5" />
-                                                <span className="font-bold leading-relaxed">{order.deliveryAddress || 'No Address Provided'}</span>
-                                            </div>
-                                            <div className="flex justify-between items-center bg-white px-4 py-3 rounded-2xl shadow-sm border border-emerald-50">
-                                                <a href={`tel:${order.contactNumber || order.consumer?.mobile}`} className="flex items-center gap-2 font-black text-emerald-700 hover:text-emerald-950 transition-colors">
-                                                    <span className="p-1.5 bg-emerald-600 text-white rounded-lg"><Truck size={12} className="rotate-0 group-hover:rotate-12 transition-transform" /></span>
-                                                    {order.contactNumber || order.consumer?.mobile || 'No Phone'}
-                                                </a>
-                                                {order.deliveryTime && (
-                                                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
-                                                        <Clock size={12} /> {order.deliveryTime}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {order.review && (
-                                            <div className="mt-4 pt-4 border-t border-emerald-50 bg-amber-50/20 p-4 rounded-2xl">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <div className="flex text-amber-400">
-                                                        {[...Array(5)].map((_, i) => (
-                                                            <Star key={i} size={14} fill={i < order.review!.rating ? "currentColor" : "none"} />
-                                                        ))}
-                                                    </div>
-                                                    <span className="text-xs font-black text-slate-900 uppercase tracking-tighter text-amber-900/60">Review from {order.consumer?.name}</span>
-                                                </div>
-                                                {order.review.comment && <p className="text-xs text-slate-600 font-medium italic">"{order.review.comment}"</p>}
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </section>
-                )}
-
-                {/* TAB 2: ADD CROP */}
-                {activeTab === 'add' && (
-                    <section className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        {/* Mode Toggle */}
-                        <div className="bg-white p-2 rounded-3xl border border-emerald-50 shadow-sm grid grid-cols-2 gap-2 max-w-sm mx-auto">
-                            <button onClick={() => setAddMode('voice')} className={`py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${addMode === 'voice' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-slate-400 hover:bg-emerald-50'}`}>
-                                <Volume2 size={16} /> Voice AI | குரல்
-                            </button>
-                            <button onClick={() => setAddMode('manual')} className={`py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${addMode === 'manual' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-slate-400 hover:bg-emerald-50'}`}>
-                                <Pencil size={16} /> Manual | நேரடி
-                            </button>
-                        </div>
-
-                        {addMode === 'voice' ? (
-                            <div className="relative w-full max-w-2xl mx-auto rounded-[40px] flex flex-col justify-center bg-emerald-50/20 p-8 border border-emerald-50">
-                                <div className="text-center mb-10">
-                                    <h2 className="text-2xl font-black text-slate-900 tracking-tight">AI Voice Assistant</h2>
-                                    <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest mt-1">பேசத் தொடங்க மைக் பட்டனை அழுத்தவும்</p>
-                                </div>
-                                <div className="relative z-10 w-full mb-8">
-                                    <VoiceQAFlow onComplete={(data) => {
-                                        onCropDataComplete(data);
-                                        setTimeout(() => setActiveTab('listings'), 2000);
-                                    }} />
-                                </div>
-                                <div className="bg-white p-6 rounded-[32px] border border-emerald-50 shadow-sm text-center">
-                                    <p className="text-slate-500 font-medium italic text-sm">"பயிர் பெயர், அளவு, விலை கூறுங்கள். நான் பார்த்துக்கொள்கிறேன்!"</p>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="bg-white rounded-[40px] p-10 border border-emerald-50 shadow-sm max-w-md mx-auto relative overflow-hidden">
-                                <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-full -mr-16 -mt-16 opacity-50" />
-                                <div className="relative z-10">
-                                    <h2 className="text-2xl font-black text-slate-900 mb-1">Add Crop</h2>
-                                    <p className="text-emerald-600 text-[10px] font-bold uppercase tracking-widest mb-8">கைமுறையாக பயிர் சேர்க்கவும்</p>
-                                    <div className="space-y-6">
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Crop Name / பயிர் பெயர்</label>
-                                            <input type="text" value={cropName} onChange={(e) => setCropName(e.target.value)} placeholder="e.g., Tomato" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-[20px] focus:ring-4 focus:ring-emerald-100 focus:bg-white focus:border-emerald-600 transition-all font-bold" />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Quantity (kg) / அளவு</label>
-                                            <input type="number" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="e.g., 50" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-[20px] focus:ring-4 focus:ring-emerald-100 focus:bg-white focus:border-emerald-600 transition-all font-bold" />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Price per kg (₹) / விலை</label>
-                                            <input type="number" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} placeholder="e.g., 40" className="w-full p-4 bg-slate-50 border border-slate-100 rounded-[20px] focus:ring-4 focus:ring-emerald-100 focus:bg-white focus:border-emerald-600 transition-all font-bold" />
-                                        </div>
-                                        <Button onClick={submitCrop} isLoading={isSubmitting} disabled={!cropName || !quantity} className="w-full bg-emerald-600 hover:bg-emerald-700 h-16 rounded-[24px] font-black text-sm uppercase tracking-widest flex flex-col gap-0.5 shadow-xl shadow-emerald-600/20 active:scale-[0.98]">
-                                            <span>Add Crop</span>
-                                            <span className="text-[9px] font-bold opacity-70">பயிர் சேர்க்க</span>
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </section>
-                )}
-
-                {/* TAB 3: MARKETPLACE LISTINGS */}
-                {activeTab === 'listings' && (
-                    <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <div className="flex justify-between items-end">
-                            <div>
-                                <h2 className="text-2xl font-black text-slate-900 tracking-tight">Marketplace Listings</h2>
-                                <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest mt-1">அனைத்து பயிர் பட்டியல்கள்</p>
-                            </div>
-                            <div className="bg-emerald-50 px-4 py-2 rounded-2xl border border-emerald-100">
-                                <span className="text-xs font-black text-emerald-700 uppercase tracking-widest">{allCrops.length} Active Crops</span>
-                            </div>
-                        </div>
-
-                        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                            {allCrops.map(crop => {
-                                const isOwner = user?.id && String(user.id) === String(crop.farmerId);
+                        <nav className="mt-4 space-y-2 max-h-[calc(100vh-200px)] overflow-y-auto pr-1">
+                            {tabs.map((tab) => {
+                                const Icon = tab.icon;
+                                const isActive = activeTab === tab.id;
                                 return (
-                                    <div key={crop.id} className={`bg-white p-7 rounded-[40px] border ${isOwner ? 'border-emerald-200 bg-emerald-50/20 shadow-xl shadow-emerald-900/5' : 'border-slate-100 shadow-sm'} transition-all hover:shadow-xl group relative overflow-hidden`}>
-                                        <div className="flex justify-between items-start mb-6">
-                                            <div className={`p-4 rounded-3xl ${isOwner ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'} shadow-lg transition-transform duration-500`}>
-                                                <Leaf size={24} />
-                                            </div>
-                                            <div className="flex gap-2">
-                                                {isOwner ? (
-                                                    <>
-                                                        <Button variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-2xl text-slate-400 hover:text-blue-600 hover:bg-blue-50 bg-slate-50 border border-slate-100 shadow-sm" onClick={() => startEdit(crop)}>
-                                                            <Pencil size={18} />
-                                                        </Button>
-                                                        <Button variant="ghost" size="sm" className="h-10 w-10 p-0 rounded-2xl text-slate-400 hover:text-red-600 hover:bg-red-50 bg-slate-50 border border-slate-100 shadow-sm" onClick={() => deleteCrop(crop.id)}>
-                                                            <Trash2 size={18} />
-                                                        </Button>
-                                                    </>
-                                                ) : (
-                                                    <div className="bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100 flex items-center gap-1.5">
-                                                        <div className="w-1 h-1 rounded-full bg-slate-400" />
-                                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Community Listing</span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {editingCropId === crop.id ? (
-                                            <div className="space-y-4">
-                                                <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="w-full p-4 bg-white border border-emerald-200 rounded-2xl font-black text-lg text-slate-900" placeholder="Crop Name" />
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <input value={editForm.quantityKg} onChange={(e) => setEditForm({ ...editForm, quantityKg: e.target.value })} className="w-full p-4 bg-white border border-emerald-200 rounded-2xl text-emerald-700 font-black" placeholder="Qty" />
-                                                    <input value={editForm.basePrice} onChange={(e) => setEditForm({ ...editForm, basePrice: e.target.value })} className="w-full p-4 bg-white border border-emerald-200 rounded-2xl text-emerald-700 font-black" placeholder="Price" />
-                                                </div>
-                                                <div className="flex gap-3 pt-2">
-                                                    <Button size="sm" onClick={() => saveEdit(crop.id)} className="flex-1 bg-emerald-600 hover:bg-emerald-700 rounded-2xl h-12 font-black uppercase text-[10px] tracking-widest">Save Changes</Button>
-                                                    <Button size="sm" variant="ghost" onClick={cancelEdit} className="flex-1 rounded-2xl h-12 bg-slate-50 font-black uppercase text-[10px] tracking-widest">Cancel</Button>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-6">
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`w-full text-left rounded-2xl px-3 py-2.5 transition-all border text-sm ${
+                                            isActive
+                                                ? 'bg-white text-emerald-900 border-white shadow-lg'
+                                                : 'bg-transparent text-white/90 border-white/10 hover:bg-white/10'
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                                <Icon size={14} />
                                                 <div>
-                                                    <div className="flex items-center gap-2 mb-1">
-                                                        <h3 className="font-black text-slate-900 text-xl capitalize tracking-tight">{crop.name}</h3>
-                                                        {isOwner && <span className="bg-emerald-500 w-1.5 h-1.5 rounded-full animate-pulse shadow-sm shadow-emerald-500/50" />}
-                                                    </div>
-                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                                                        {isOwner ? 'Your Listing | உங்களது' : `By ${crop.farmer?.name || 'Farmer'} | மற்றவர்`}
-                                                    </p>
-                                                </div>
-
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div className="bg-slate-50/50 p-4 rounded-[28px] border border-slate-50">
-                                                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Available | அளவு</p>
-                                                        <p className="text-2xl font-black text-slate-950 tracking-tight">{crop.quantityKg}<span className="text-xs ml-1 opacity-50">kg</span></p>
-                                                    </div>
-                                                    <div className="bg-emerald-50/50 p-4 rounded-[28px] border border-emerald-50">
-                                                        <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1">Price | விலை</p>
-                                                        <p className="text-2xl font-black text-emerald-950 tracking-tight">₹{crop.basePrice}<span className="text-[10px] ml-1 opacity-50">/kg</span></p>
-                                                    </div>
+                                                    <p className="font-black text-xs uppercase tracking-wider">{tab.label}</p>
+                                                    <p className={`text-[10px] leading-none ${isActive ? 'text-emerald-700' : 'text-emerald-100/70'}`}>{tab.subtitle}</p>
                                                 </div>
                                             </div>
-                                        )}
-                                    </div>
+                                            {tab.badge !== undefined && (
+                                                <span className={`h-5 w-5 px-0.5 text-[9px] font-black rounded-full flex items-center justify-center shrink-0 ${isActive ? 'bg-emerald-100 text-emerald-800' : 'bg-white/20 text-white'}`}>
+                                                    {tab.badge}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </button>
                                 );
                             })}
-                            {allCrops.length === 0 && (
-                                <div className="text-center py-32 px-6 col-span-2 bg-white rounded-[40px] border-2 border-dashed border-emerald-100/50 flex flex-col items-center">
-                                    <div className="w-24 h-24 bg-emerald-50 rounded-full flex items-center justify-center mb-6 shadow-inner ring-8 ring-emerald-50/20">
-                                        <Package className="text-emerald-200" size={48} />
+                        </nav>
+                    </aside>
+
+                    <div className="bg-white border border-emerald-100 rounded-[28px] p-5 md:p-7 shadow-sm">
+                        {activeTab === 'orders' && (
+                            <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="flex flex-wrap justify-between items-start gap-4">
+                                    <div>
+                                        <p className="text-[10px] uppercase tracking-[0.2em] font-black text-emerald-600">ஆர்டர் மையம்</p>
+                                        <h2 className="text-2xl font-black text-slate-900 tracking-tight">அனுப்பும் நடைபாதை</h2>
+                                        <p className="text-sm text-slate-500 mt-1">வாங்குபவரின் ஒவ்வொரு ஆர்டரையும் தொடக்கம் முதல் விநியோகம் வரை கண்காணிக்கவும்.</p>
                                     </div>
-                                    <p className="text-slate-900 font-black text-lg">No marketplace listings</p>
-                                    <p className="text-emerald-600 font-bold text-xs uppercase tracking-widest mt-1">பட்டியல்கள் எதுவும் இல்லை</p>
-                                    <Button onClick={() => setActiveTab('add')} className="mt-8 bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-[20px] font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-200">
-                                        Add Your First Crop
+                                    <Button variant="ghost" size="sm" onClick={fetchData} className="text-emerald-700 font-black text-[11px] uppercase tracking-widest bg-emerald-50 px-4 rounded-xl border border-emerald-100">
+                                        <Clock size={14} className="mr-2" /> புதுப்பிக்க
                                     </Button>
                                 </div>
-                            )}
-                        </div>
-                    </section>
-                )}
 
-                {/* TAB 4: BULK INQUIRIES */}
-                {activeTab === 'inquiries' && (
-                    <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <div className="flex justify-between items-end">
-                            <div>
-                                <h2 className="text-xl font-black text-slate-900 tracking-tight">Bulk Inquiries</h2>
-                                <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest mt-0.5 ml-0.5">சமீபத்திய விசாரணை</p>
-                            </div>
-                            <Button variant="ghost" size="sm" onClick={fetchData} className="text-emerald-600 font-black text-[11px] uppercase tracking-widest bg-emerald-50 px-4 rounded-xl border border-emerald-100 shadow-sm">
-                                <Clock size={14} className="mr-2" /> Refresh
-                            </Button>
-                        </div>
-
-                        {inquiries.length === 0 ? (
-                            <div className="text-center py-32 bg-white rounded-[40px] border-2 border-dashed border-emerald-100/50 flex flex-col items-center">
-                                <div className="bg-emerald-50/50 w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-inner ring-8 ring-emerald-50/20">
-                                    <MessageSquare className="text-emerald-200" size={48} />
-                                </div>
-                                <h3 className="text-slate-900 text-lg font-black">No inquiries yet</h3>
-                                <p className="text-emerald-600 font-bold text-xs uppercase tracking-widest mt-1">விசாரணைகள் எதுவும் இல்லை</p>
-                                <p className="text-slate-400 text-sm mt-4 max-w-xs mx-auto text-balance">Bulk order request messages from consumers will appear here.</p>
-                            </div>
-                        ) : (
-                            <div className="grid gap-6 md:grid-cols-2">
-                                {inquiries.map(inquiry => (
-                                    <div key={inquiry.id} className="bg-white p-8 rounded-[40px] shadow-sm border border-emerald-50 hover:shadow-xl hover:shadow-emerald-900/5 transition-all relative overflow-hidden">
-                                        <div className="absolute top-0 right-0 w-24 h-24 bg-amber-50 rounded-full -mr-12 -mt-12 opacity-50" />
-                                        <div className="flex justify-between items-start mb-6 relative z-10">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-14 h-14 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-xl shadow-lg ring-4 ring-slate-50">
-                                                    {inquiry.consumer?.name?.charAt(0).toUpperCase()}
-                                                </div>
-                                                <div>
-                                                    <h3 className="font-black text-slate-900 text-lg tracking-tight">{inquiry.consumer?.name}</h3>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new Date(inquiry.createdAt).toLocaleString()}</p>
-                                                </div>
-                                            </div>
-                                            <div className="bg-amber-100 text-amber-900 px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border border-amber-200 shadow-sm">
-                                                New Inquiry
-                                            </div>
-                                        </div>
-
-                                        <div className="bg-slate-50 p-6 rounded-[28px] border border-slate-100 mb-6 text-sm text-slate-700 italic font-medium leading-relaxed">
-                                            "{inquiry.message}"
-                                        </div>
-
-                                        <div className="flex flex-col gap-4 pt-6 border-t border-slate-100">
-                                            <div className="grid grid-cols-2 gap-3 text-[11px] font-bold text-slate-500 bg-emerald-50/30 p-4 rounded-[24px] border border-emerald-50/50">
-                                                {inquiry.crop?.name && <p className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-600" /> <span className="text-slate-400 uppercase text-[9px]">Crop:</span> {inquiry.crop.name}</p>}
-                                                {inquiry.quantity && <p className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-600" /> <span className="text-slate-400 uppercase text-[9px]">Need:</span> {inquiry.quantity}kg</p>}
-                                                {inquiry.proposedPrice && <p className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-600" /> <span className="text-slate-400 uppercase text-[9px]">Offer:</span> ₹{inquiry.proposedPrice}/kg</p>}
-                                                {inquiry.deliveryAddress && <p className="col-span-2 mt-2 flex items-start gap-2"><MapPin size={12} className="text-emerald-600 shrink-0 mt-0.5" /> <span>{inquiry.deliveryAddress}</span></p>}
-                                            </div>
-                                            <div className="flex justify-between items-center mt-2">
-                                                <div>
-                                                    <p className="text-lg font-black text-slate-900 tracking-tight leading-none">📞 {inquiry.contactNumber || inquiry.consumer?.mobile || 'No Phone'}</p>
-                                                    <p className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest mt-1">Direct Contact</p>
-                                                </div>
-                                                <Button size="sm" onClick={() => window.open(`tel:${inquiry.contactNumber || inquiry.consumer?.mobile}`, '_self')} className="bg-slate-900 hover:bg-black text-white px-8 rounded-2xl h-12 font-black uppercase text-[10px] tracking-widest shadow-lg shadow-slate-900/20">
-                                                    Call Buyer
-                                                </Button>
-                                            </div>
-                                        </div>
+                                <div className="grid gap-3 sm:grid-cols-3">
+                                    <div className="rounded-2xl border border-orange-200 bg-orange-50 p-4">
+                                        <p className="text-[11px] font-black uppercase tracking-widest text-orange-700">புதியவை</p>
+                                        <p className="text-2xl font-black text-orange-900 mt-1">{orders.filter((o) => o.status === 'PLACED').length}</p>
                                     </div>
-                                ))}
-                            </div>
-                        )}
-                    </section>
-                )}
-                {/* TAB 5: PRICE INSIGHTS */}
-                {activeTab === 'prices' && (
-                    <section className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <PriceInsightsChart crops={allCrops} />
-                    </section>
-                )}
-
-                {/* TAB 6: REVIEWS */}
-                {activeTab === 'reviews' && (
-                    <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <div className="flex justify-between items-end">
-                            <div>
-                                <h2 className="text-xl font-black text-slate-900 tracking-tight">Customer Reviews</h2>
-                                <p className="text-xs font-bold text-emerald-600 uppercase tracking-widest mt-0.5 ml-0.5">வாடிக்கையாளர் மதிப்பீடுகள்</p>
-                            </div>
-                            <Button variant="ghost" size="sm" onClick={fetchData} className="text-emerald-600 font-black text-[11px] uppercase tracking-widest bg-emerald-50 px-4 rounded-xl border border-emerald-100 shadow-sm">
-                                <Clock size={14} className="mr-2" /> Refresh
-                            </Button>
-                        </div>
-
-                        {reviews.length === 0 ? (
-                            <div className="text-center py-32 bg-white rounded-[40px] border-2 border-dashed border-emerald-100/50 flex flex-col items-center">
-                                <div className="bg-emerald-50/50 w-24 h-24 rounded-full flex items-center justify-center mb-6 shadow-inner ring-8 ring-emerald-50/20">
-                                    <Star className="text-emerald-200" size={48} />
+                                    <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4">
+                                        <p className="text-[11px] font-black uppercase tracking-widest text-blue-700">நடைமுறையில்</p>
+                                        <p className="text-2xl font-black text-blue-900 mt-1">{orders.filter((o) => o.status === 'ACCEPTED' || o.status === 'OUT_FOR_DELIVERY').length}</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                                        <p className="text-[11px] font-black uppercase tracking-widest text-emerald-700">வழங்கப்பட்டது</p>
+                                        <p className="text-2xl font-black text-emerald-900 mt-1">{deliveredOrders}</p>
+                                    </div>
                                 </div>
-                                <h3 className="text-slate-900 text-lg font-black">No reviews yet</h3>
-                                <p className="text-emerald-600 font-bold text-xs uppercase tracking-widest mt-1">மதிப்பீடுகள் எதுவும் இல்லை</p>
-                                <p className="text-slate-400 text-sm mt-4 max-w-xs mx-auto text-balance">Once consumers rate your delivered crops, their feedback will appear here to help you improve.</p>
-                            </div>
-                        ) : (
-                            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                                {reviews.map(review => (
-                                    <div key={review.id} className="bg-white p-6 rounded-[32px] shadow-sm border border-emerald-50 hover:shadow-xl hover:shadow-emerald-900/5 transition-all group">
-                                        <div className="flex justify-between items-start mb-4">
+
+                                {orders.length === 0 ? (
+                                    <div className="text-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+                                        <Truck className="mx-auto text-slate-300 mb-4" size={42} />
+                                        <h3 className="text-lg font-black text-slate-900">இப்போது ஆர்டர்கள் இல்லை</h3>
+                                        <p className="text-sm text-slate-500 mt-2">புதிய ஆர்டர்கள் இங்கே விரைவான நிலை பொத்தான்களுடன் தோன்றும்.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {orders.map((order) => (
+                                            <div key={order.id} className="rounded-3xl border border-slate-200 p-5 bg-gradient-to-r from-white to-slate-50/70">
+                                                <div className="flex flex-wrap items-start justify-between gap-4">
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <StatusIcon status={order.status} />
+                                                            <div>
+                                                                <p className="text-sm font-black text-slate-900 uppercase tracking-wider">{getStatusTamil(order.status)}</p>
+                                                                <p className="text-[11px] text-slate-500">#{order.id.slice(0, 8)} • {new Date(order.createdAt).toLocaleString('ta-IN')}</p>
+                                                            </div>
+                                                        </div>
+                                                        <p className="text-sm font-bold text-slate-700">வாங்குபவர்: {order.consumer?.name || 'தெரியாதவர்'}</p>
+                                                        <p className="text-[12px] text-slate-500">{order.items?.length || 0} பொருட்கள் • டெலிவரி ₹{order.deliveryCharge}</p>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-[10px] uppercase tracking-widest text-slate-400 font-black">மொத்த தொகை</p>
+                                                        <p className="text-2xl font-black text-slate-900">₹{order.totalAmount + order.deliveryCharge}</p>
+                                                        <Button variant="ghost" size="sm" onClick={() => speakOrder(order)} className="mt-2 border border-slate-200 rounded-xl">
+                                                            <Volume2 size={14} className="mr-1" /> ஒலி படிக்க
+                                                        </Button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                                                    {order.items?.map((item) => (
+                                                        <div key={item.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2 flex justify-between">
+                                                            <span className="font-semibold text-slate-700 capitalize">{item.crop?.name}</span>
+                                                            <span className="text-sm font-black text-slate-900">{item.quantity}kg</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                                                    <a href={`tel:${order.contactNumber || order.consumer?.mobile}`} className="text-sm font-bold text-emerald-700">
+                                                        அழைக்க: {order.contactNumber || order.consumer?.mobile || 'எண் இல்லை'}
+                                                    </a>
+                                                    <div className="flex gap-2">
+                                                        {order.status === 'PLACED' && <Button size="sm" onClick={() => updateStatus(order.id, 'ACCEPTED')} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl">ஏற்க</Button>}
+                                                        {order.status === 'ACCEPTED' && <Button size="sm" onClick={() => updateStatus(order.id, 'OUT_FOR_DELIVERY')} className="bg-purple-600 hover:bg-purple-700 text-white rounded-xl">அனுப்பு</Button>}
+                                                        {order.status === 'OUT_FOR_DELIVERY' && <Button size="sm" onClick={() => updateStatus(order.id, 'DELIVERED')} className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl">வழங்கியது</Button>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </section>
+                        )}
+
+                        {activeTab === 'add' && (
+                            <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                {/* Header Section */}
+                                <div className="space-y-4">
+                                    {/* Mode Toggle */}
+                                    <div className="flex gap-3 w-fit">
+                                        <button 
+                                            onClick={() => setAddMode('voice')} 
+                                            className={`flex items-center gap-2.5 px-6 py-3.5 rounded-xl font-bold uppercase tracking-wider transition-all border-2 ${
+                                                addMode === 'voice' 
+                                                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-600/30' 
+                                                    : 'bg-white text-emerald-600 border-emerald-200 hover:border-emerald-300'
+                                            }`}
+                                        >
+                                            <Mic size={18} />
+                                            By Voice
+                                        </button>
+                                        <button 
+                                            onClick={() => setAddMode('manual')} 
+                                            className={`flex items-center gap-2.5 px-6 py-3.5 rounded-xl font-bold uppercase tracking-wider transition-all border-2 ${
+                                                addMode === 'manual' 
+                                                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-600/30' 
+                                                    : 'bg-white text-emerald-600 border-emerald-200 hover:border-emerald-300'
+                                            }`}
+                                        >
+                                            <Pencil size={18} />
+                                            Manually
+                                        </button>
+                                    </div>
+                                </div>
+
+                                {/* Voice Mode */}
+                                {addMode === 'voice' && (
+                                    <div className="animate-in fade-in duration-300">
+                                        <VoiceQAFlow language={voiceLanguage} onLanguageChange={setVoiceLanguage} onComplete={(data) => {
+                                            onCropDataComplete(data);
+                                            setTimeout(() => setActiveTab('listings'), 2000);
+                                        }} />
+                                    </div>
+                                )}
+
+                                {/* Manual Mode */}
+                                {addMode === 'manual' && (
+                                    <div className="space-y-6 animate-in fade-in duration-300">
+                                        <div className="bg-emerald-50 border-2 border-emerald-200 rounded-2xl p-6 space-y-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black">
-                                                    {review.consumer.name.charAt(0).toUpperCase()}
+                                                <div className="p-2.5 bg-white rounded-lg border border-emerald-200">
+                                                    <Pencil size={20} className="text-emerald-600" />
                                                 </div>
                                                 <div>
-                                                    <h4 className="font-black text-slate-900 text-sm leading-tight">{review.consumer.name}</h4>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{new Date(review.createdAt).toLocaleDateString()}</p>
+                                                    <p className="text-sm font-black text-gray-900">Manual Entry</p>
+                                                    <p className="text-xs text-gray-500 mt-0.5">Fill in every detail to list your crop</p>
                                                 </div>
                                             </div>
-                                            <div className="flex text-amber-400">
-                                                {[...Array(5)].map((_, i) => (
-                                                    <Star key={i} size={12} fill={i < review.rating ? "currentColor" : "none"} />
-                                                ))}
+                                        </div>
+
+                                        {/* Form Section */}
+                                        <div className="space-y-5 max-w-2xl">
+                                            {/* Crop Name */}
+                                            <div className="space-y-2.5">
+                                                <label className="block text-xs font-black text-gray-900 uppercase tracking-wider">Crop Name</label>
+                                                <input 
+                                                    type="text" 
+                                                    value={cropName} 
+                                                    onChange={(e) => setCropName(e.target.value)} 
+                                                    placeholder="e.g. Tomato, Onion, Rice" 
+                                                    className="w-full px-4 py-3.5 rounded-xl border-2 border-emerald-200 bg-white text-gray-900 font-semibold placeholder-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all hover:border-emerald-300"
+                                                />
                                             </div>
+
+                                            {/* Quantity & Price Grid */}
+                                            <div className="grid grid-cols-2 gap-5">
+                                                <div className="space-y-2.5">
+                                                    <label className="block text-xs font-black text-gray-900 uppercase tracking-wider">Quantity (kg)</label>
+                                                    <input 
+                                                        type="number" 
+                                                        value={quantity} 
+                                                        onChange={(e) => setQuantity(e.target.value)} 
+                                                        placeholder="50" 
+                                                        className="w-full px-4 py-3.5 rounded-xl border-2 border-emerald-200 bg-white text-gray-900 font-semibold placeholder-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all hover:border-emerald-300"
+                                                    />
+                                                </div>
+
+                                                <div className="space-y-2.5">
+                                                    <label className="block text-xs font-black text-gray-900 uppercase tracking-wider">Price (/kg)</label>
+                                                    <input 
+                                                        type="number" 
+                                                        value={basePrice} 
+                                                        onChange={(e) => setBasePrice(e.target.value)} 
+                                                        placeholder="40" 
+                                                        className="w-full px-4 py-3.5 rounded-xl border-2 border-emerald-200 bg-white text-gray-900 font-semibold placeholder-gray-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 outline-none transition-all hover:border-emerald-300"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            {/* Info Box */}
+                                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 space-y-2">
+                                                <p className="text-xs font-bold text-emerald-700 uppercase tracking-wider">Summary</p>
+                                                <div className="text-sm text-gray-700 space-y-1">
+                                                    <p>{cropName || 'Crop'} • <span className="font-bold">{quantity || '0'} kg</span></p>
+                                                    <p className="font-bold text-emerald-600">
+                                                        Total: ₹{((parseFloat(quantity) || 0) * (parseFloat(basePrice) || 0)).toLocaleString()}
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            {/* Submit Button */}
+                                            <Button 
+                                                onClick={submitCrop} 
+                                                isLoading={isSubmitting} 
+                                                disabled={!cropName || !quantity || !basePrice}
+                                                className="w-full px-6 py-4 rounded-xl font-black uppercase tracking-wider text-base bg-emerald-600 text-white hover:bg-emerald-700 disabled:bg-gray-300 disabled:text-gray-400 transition-all active:scale-95 shadow-lg hover:shadow-xl"
+                                            >
+                                                {isSubmitting ? 'Publishing...' : 'Publish Crop'}
+                                            </Button>
                                         </div>
-                                        <div className="mb-4">
-                                            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2.5 py-1 rounded-lg">Product: {review.crop.name}</span>
-                                        </div>
-                                        {review.comment && (
-                                            <p className="text-sm text-slate-600 font-medium italic leading-relaxed">
-                                                "{review.comment}"
-                                            </p>
-                                        )}
                                     </div>
-                                ))}
-                            </div>
+                                )}
+                            </section>
                         )}
-                    </section>
-                )}
+
+                        {activeTab === 'listings' && (
+                            <section className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div>
+                                        <p className="text-[10px] uppercase tracking-[0.2em] font-black text-emerald-600">நேரடி பட்டியல்</p>
+                                        <h2 className="text-2xl font-black text-slate-900">சரக்கு பலகை</h2>
+                                    </div>
+                                    <Button variant="ghost" size="sm" onClick={fetchData} className="border border-emerald-100">புதுப்பிக்க</Button>
+                                </div>
+
+                                {allCrops.length === 0 ? (
+                                    <div className="text-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+                                        <Package className="mx-auto text-slate-300 mb-4" size={40} />
+                                        <h3 className="text-lg font-black text-slate-900">செயலில் பட்டியல் இல்லை</h3>
+                                        <Button onClick={() => setActiveTab('add')} className="mt-5 rounded-xl">முதல் பட்டியல் உருவாக்கு</Button>
+                                    </div>
+                                ) : (
+                                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                                        {allCrops.map((crop) => {
+                                            const isOwner = user?.id && String(user.id) === String(crop.farmerId);
+                                            return (
+                                                <div key={crop.id} className={`rounded-2xl border p-4 h-full ${isOwner ? 'border-emerald-300 bg-emerald-50/50' : 'border-slate-200 bg-white'}`}>
+                                                    {editingCropId === crop.id ? (
+                                                        <div className="grid gap-3">
+                                                            <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} className="h-11 rounded-xl border border-slate-200 px-3" placeholder="பயிர் பெயர்" />
+                                                            <input value={editForm.quantityKg} onChange={(e) => setEditForm({ ...editForm, quantityKg: e.target.value })} className="h-11 rounded-xl border border-slate-200 px-3" placeholder="அளவு" />
+                                                            <input value={editForm.basePrice} onChange={(e) => setEditForm({ ...editForm, basePrice: e.target.value })} className="h-11 rounded-xl border border-slate-200 px-3" placeholder="விலை" />
+                                                            <Button size="sm" onClick={() => saveEdit(crop.id)} className="rounded-xl">சேமிக்க</Button>
+                                                            <Button size="sm" variant="ghost" onClick={cancelEdit} className="rounded-xl border border-slate-200">ரத்து</Button>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex h-full flex-col justify-between gap-4">
+                                                            <div>
+                                                                <p className="text-lg font-black text-slate-900 capitalize">{crop.name}</p>
+                                                                <p className="text-sm text-slate-500">{crop.quantityKg} kg கிடைக்கும் • ₹{crop.basePrice}/kg</p>
+                                                                <p className="text-[11px] text-slate-400 mt-1">{isOwner ? 'உங்கள் பட்டியல்' : `${crop.farmer?.name || 'விவசாயி'} வெளியீடு`}</p>
+                                                            </div>
+                                                            {isOwner && (
+                                                                <div className="flex gap-2 pt-2">
+                                                                    <Button variant="ghost" size="sm" className="rounded-xl border border-slate-200" onClick={() => startEdit(crop)}>
+                                                                        <Pencil size={14} />
+                                                                    </Button>
+                                                                    <Button variant="ghost" size="sm" className="rounded-xl border border-red-200 text-red-600" onClick={() => deleteCrop(crop.id)}>
+                                                                        <Trash2 size={14} />
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </section>
+                        )}
+
+                        {activeTab === 'inquiries' && (
+                            <section className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="flex flex-wrap justify-between gap-3 items-start">
+                                    <div>
+                                        <p className="text-[10px] uppercase tracking-[0.2em] font-black text-amber-700">விற்பனை பேச்சு</p>
+                                        <h2 className="text-2xl font-black text-slate-900">வாங்குபவர் விசாரணைகள்</h2>
+                                        <p className="text-sm text-slate-500">நுகர்வோரின் மொத்த கோரிக்கைகள் மற்றும் விலை பேச்சுவார்த்தைகள்.</p>
+                                    </div>
+                                    <Button variant="ghost" size="sm" onClick={fetchData} className="border border-amber-200 bg-amber-50 text-amber-800">புதுப்பிக்க</Button>
+                                </div>
+
+                                {inquiries.length === 0 ? (
+                                    <div className="text-center py-20 rounded-3xl border border-dashed border-amber-200 bg-amber-50/40">
+                                        <MessageSquare className="mx-auto text-amber-300 mb-4" size={40} />
+                                        <h3 className="text-lg font-black text-slate-900">இன்னும் விசாரணைகள் இல்லை</h3>
+                                    </div>
+                                ) : (
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        {inquiries.map((inquiry) => (
+                                            <div key={inquiry.id} className="rounded-2xl border border-amber-200 bg-white p-5">
+                                                <div className="flex justify-between items-start gap-2">
+                                                    <div>
+                                                        <p className="text-lg font-black text-slate-900">{inquiry.consumer?.name || 'வாங்குபவர்'}</p>
+                                                        <p className="text-[11px] text-slate-500">{new Date(inquiry.createdAt).toLocaleString('ta-IN')}</p>
+                                                    </div>
+                                                    <span className="text-[10px] font-black uppercase tracking-widest bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full">திறந்த பேச்சு</span>
+                                                </div>
+                                                <p className="mt-3 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-xl p-3">{inquiry.message}</p>
+                                                <div className="mt-3 space-y-1 text-sm text-slate-600">
+                                                    {inquiry.crop?.name && <p>பயிர்: <span className="font-semibold">{inquiry.crop.name}</span></p>}
+                                                    {inquiry.quantity && <p>அளவு: <span className="font-semibold">{inquiry.quantity} kg</span></p>}
+                                                    {inquiry.proposedPrice && <p>சலுகை விலை: <span className="font-semibold">₹{inquiry.proposedPrice}/kg</span></p>}
+                                                </div>
+                                                <div className="mt-4 flex justify-between items-center">
+                                                    <span className="text-sm font-bold text-amber-800">{inquiry.contactNumber || inquiry.consumer?.mobile || 'எண் இல்லை'}</span>
+                                                    <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white rounded-xl" onClick={() => window.open(`tel:${inquiry.contactNumber || inquiry.consumer?.mobile}`, '_self')}>
+                                                        வாங்குபவரை அழைக்க
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </section>
+                        )}
+
+                        {activeTab === 'prices' && (
+                            <section className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="rounded-3xl border border-sky-200 bg-sky-50 p-5">
+                                    <p className="text-[10px] uppercase tracking-[0.2em] font-black text-sky-700">விலை ரேடார்</p>
+                                    <h2 className="text-2xl font-black text-slate-900 mt-1">சந்தை போக்கு குறியீடுகள்</h2>
+                                    <p className="text-sm text-slate-600 mt-1">பயிர் விலை மாற்றங்களை கவனித்து, சிறந்த லாபத்திற்கு உங்கள் விலையை மாற்றுங்கள்.</p>
+                                </div>
+                                <PriceInsightsChart crops={allCrops} />
+                            </section>
+                        )}
+
+                        {activeTab === 'reviews' && (
+                            <section className="space-y-5 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="grid gap-3 sm:grid-cols-3">
+                                    <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
+                                        <p className="text-[11px] font-black uppercase tracking-widest text-violet-700">சராசரி மதிப்பீடு</p>
+                                        <p className="text-3xl font-black text-violet-900 mt-1">{averageRating}</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
+                                        <p className="text-[11px] font-black uppercase tracking-widest text-emerald-700">மொத்த மதிப்புரைகள்</p>
+                                        <p className="text-3xl font-black text-emerald-900 mt-1">{reviews.length}</p>
+                                    </div>
+                                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                        <p className="text-[11px] font-black uppercase tracking-widest text-slate-700">முடிக்கப்பட்ட ஆர்டர்கள்</p>
+                                        <p className="text-3xl font-black text-slate-900 mt-1">{deliveredOrders}</p>
+                                    </div>
+                                </div>
+
+                                {reviews.length === 0 ? (
+                                    <div className="text-center py-20 rounded-3xl border border-dashed border-slate-200 bg-slate-50">
+                                        <Star className="mx-auto text-slate-300 mb-4" size={40} />
+                                        <h3 className="text-lg font-black text-slate-900">இன்னும் மதிப்பீடுகள் இல்லை</h3>
+                                        <p className="text-sm text-slate-500 mt-2">மேலும் ஆர்டர்கள் வழங்கி நம்பிக்கை மதிப்பை உயர்த்துங்கள்.</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        {reviews.map((review) => (
+                                            <div key={review.id} className="rounded-2xl border border-slate-200 p-5 bg-white">
+                                                <div className="flex justify-between items-center">
+                                                    <div>
+                                                        <p className="font-black text-slate-900">{review.consumer.name}</p>
+                                                        <p className="text-[11px] text-slate-500">{new Date(review.createdAt).toLocaleDateString('ta-IN')} • {review.crop.name}</p>
+                                                    </div>
+                                                    <div className="flex text-amber-400">
+                                                        {[...Array(5)].map((_, i) => (
+                                                            <Star key={i} size={14} fill={i < review.rating ? 'currentColor' : 'none'} />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                {review.comment && <p className="mt-3 text-sm text-slate-600">"{review.comment}"</p>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </section>
+                        )}
+                    </div>
+                </section>
             </main>
 
             {/* Footer */}
