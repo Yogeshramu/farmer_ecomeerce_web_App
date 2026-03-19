@@ -60,7 +60,6 @@ export default function VoiceQAFlow({ onComplete, language = 'ta-IN', onLanguage
         setAnswers(newAnswers);
 
         if (response.priceReason) setPriceReason(response.priceReason);
-
         resetTranscript();
         setAiStatus(response.message);
 
@@ -343,6 +342,33 @@ export default function VoiceQAFlow({ onComplete, language = 'ta-IN', onLanguage
                                         )}
                                     </div>
                                 )}
+
+                                <div className="rounded-2xl border border-emerald-200 bg-white p-4">
+                                    <div className="flex items-center gap-2 mb-3">
+                                        <CheckCircle size={15} className="text-emerald-600" />
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">
+                                            {currentLang === 'ta-IN' ? 'எக்ஸ்ட்ராக்ஷன் போர்டு' : 'Extraction Board'}
+                                        </p>
+                                    </div>
+                                    <div className="grid gap-3 md:grid-cols-3">
+                                        <LightDataCard
+                                            label={currentLang === 'ta-IN' ? 'பயிர்' : 'Crop'}
+                                            value={answers.name}
+                                            placeholder={currentLang === 'ta-IN' ? 'காத்திருக்கிறது' : 'Waiting'}
+                                        />
+                                        <LightDataCard
+                                            label={currentLang === 'ta-IN' ? 'அளவு (kg)' : 'Quantity (kg)'}
+                                            value={answers.quantityKg}
+                                            placeholder="0"
+                                        />
+                                        <LightDataCard
+                                            label={currentLang === 'ta-IN' ? 'விலை /kg' : 'Price /kg'}
+                                            value={answers.basePrice}
+                                            placeholder="0"
+                                            showIcon
+                                        />
+                                    </div>
+                                </div>
                             </div>
                         )}
 

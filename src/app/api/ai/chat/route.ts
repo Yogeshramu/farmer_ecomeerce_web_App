@@ -19,7 +19,7 @@ export async function POST(req: Request) {
             body: JSON.stringify({
                 model: 'llama-3.3-70b-versatile',
                 messages,
-                temperature: 0.7
+                temperature: 0.3
             })
         });
 

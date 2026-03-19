@@ -3,18 +3,16 @@ import { NextResponse } from 'next/server';
 export async function POST(req: Request) {
     try {
         const { text, language } = await req.json();
+        const isTamil = language === 'ta-IN';
 
         // Check for ElevenLabs API Key (Best for Tamil Slang / Emotional Voice)
         const elevenLabsKey = process.env.ELEVENLABS_API_KEY;
         const openAIKey = process.env.OPENAI_API_KEY;
 
         if (elevenLabsKey) {
-            // You can easily change the tone by swapping the 'voiceId' string below!
-            //  - '2EiwWnXFnvU5JabPnv8n' = Clyde (Deep, warm, authentic older male farmer vibe)
-            //  - 'EXAVITQu4vr4xnSDxMaL' = Bella (Soft, sweet young female voice)
-            //  - 'pNInz6obpgDQGcFmaJgB' = Adam (Clear, professional middle-aged male)
-            //  - 'ThT5KcBeYPX3keUQqHPh' = Dorothy (Pleasant, motherly Indian female tone)
-            const voiceId = 'EXAVITQu4vr4xnSDxMaL'; // <-- Change this ID to change the voice!
+            const tamilVoiceId = process.env.ELEVENLABS_TAMIL_VOICE_ID || 'ThT5KcBeYPX3keUQqHPh';
+            const englishVoiceId = process.env.ELEVENLABS_ENGLISH_VOICE_ID || 'EXAVITQu4vr4xnSDxMaL';
+            const voiceId = isTamil ? tamilVoiceId : englishVoiceId;
 
             const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
                 method: 'POST',
@@ -27,8 +25,10 @@ export async function POST(req: Request) {
                     text: text,
                     model_id: 'eleven_multilingual_v2',
                     voice_settings: {
-                        stability: 0.5,
-                        similarity_boost: 0.75
+                        stability: 0.72,
+                        similarity_boost: 0.82,
+                        style: 0.18,
+                        use_speaker_boost: true
                     }
                 })
             });
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
                 body: JSON.stringify({
                     model: 'tts-1',
                     input: text,
-                    voice: 'alloy' // You can change to 'echo', 'fable', 'onyx', 'nova', or 'shimmer'
+                    voice: isTamil ? 'nova' : 'alloy'
                 })
             });
 

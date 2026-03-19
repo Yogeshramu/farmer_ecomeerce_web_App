@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import VoiceQAFlow from '@/app/components/VoiceQAFlow';
+import VoiceFarmingInsights from '@/app/components/VoiceFarmingInsights';
 import PriceInsightsChart from '@/app/components/PriceInsightsChart';
 import { Button } from '@/app/components/ui/Button';
 import { Language } from '@/app/hooks/useVoiceInput';
@@ -361,9 +362,10 @@ export default function FarmerDashboard() {
     };
 
     // Tab State
-    const [activeTab, setActiveTab] = useState<'orders' | 'add' | 'listings' | 'inquiries' | 'prices' | 'reviews'>('orders');
+    const [activeTab, setActiveTab] = useState<'orders' | 'add' | 'insights' | 'listings' | 'inquiries' | 'prices' | 'reviews'>('orders');
     const [addMode, setAddMode] = useState<'voice' | 'manual'>('voice');
     const [voiceLanguage, setVoiceLanguage] = useState<Language>('ta-IN');
+    const [insightLanguage, setInsightLanguage] = useState<Language>('ta-IN');
 
     // ... (rest of existing state and logic remains, I will just re-render the return)
 
@@ -383,7 +385,7 @@ export default function FarmerDashboard() {
     };
 
     const tabs: Array<{
-        id: 'orders' | 'add' | 'listings' | 'inquiries' | 'prices' | 'reviews';
+        id: 'orders' | 'add' | 'insights' | 'listings' | 'inquiries' | 'prices' | 'reviews';
         label: string;
         subtitle: string;
         icon: typeof Truck;
@@ -391,6 +393,7 @@ export default function FarmerDashboard() {
     }> = [
         { id: 'orders', label: 'ஆர்டர் மையம்', subtitle: 'நிலை & செயல்கள்', icon: Truck, badge: orders.filter((o) => o.status !== 'DELIVERED').length },
         { id: 'add', label: 'பயிர் சேர்க்க', subtitle: 'குரல் அல்லது படிவம்', icon: Sparkles },
+        { id: 'insights', label: 'குரல் ஆலோசனை', subtitle: 'விவசாய நுண்ணறிவு', icon: Mic },
         { id: 'listings', label: 'நேரடி பட்டியல்', subtitle: 'சரக்கு பலகை', icon: Package, badge: allCrops.length },
         { id: 'inquiries', label: 'வாங்குபவர் பேசு', subtitle: 'விசாரணைகள்', icon: MessageSquare, badge: inquiries.length },
         { id: 'prices', label: 'விலை ரேடார்', subtitle: 'சந்தை போக்கு', icon: TrendingUp },
@@ -398,7 +401,7 @@ export default function FarmerDashboard() {
     ];
 
     return (
-        <div className="min-h-screen bg-white font-sans text-slate-900 pb-20">
+        <div className="min-h-screen bg-white font-sans text-slate-900">
             {toast && (
                 <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-2xl shadow-xl animate-in fade-in slide-in-from-top-4 duration-300 flex items-center gap-3 border ${
                     toast.type === 'success' ? 'bg-emerald-600 border-emerald-700 text-white' : 'bg-red-500 border-red-600 text-white'
@@ -600,7 +603,7 @@ export default function FarmerDashboard() {
                                             }`}
                                         >
                                             <Mic size={18} />
-                                            By Voice
+                                            குரல் வழி
                                         </button>
                                         <button 
                                             onClick={() => setAddMode('manual')} 
@@ -611,7 +614,7 @@ export default function FarmerDashboard() {
                                             }`}
                                         >
                                             <Pencil size={18} />
-                                            Manually
+                                            கைமுறை
                                         </button>
                                     </div>
                                 </div>
@@ -703,6 +706,18 @@ export default function FarmerDashboard() {
                                         </div>
                                     </div>
                                 )}
+                            </section>
+                        )}
+
+                        {activeTab === 'insights' && (
+                            <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                <div className="space-y-1">
+                                    <p className="text-[10px] uppercase tracking-[0.2em] font-black text-emerald-600">Voice Advisory</p>
+                                    <h2 className="text-2xl font-black text-slate-900">விவசாய குரல் ஆலோசனை மையம்</h2>
+                                    <p className="text-sm text-slate-500">பூச்சி, நோய், பாசனம், உரம், சந்தை போக்கு குறித்து குரலில் கேட்டு உடனடி ஆலோசனை பெறுங்கள்.</p>
+                                </div>
+
+                                <VoiceFarmingInsights language={insightLanguage} onLanguageChange={setInsightLanguage} />
                             </section>
                         )}
 
@@ -870,7 +885,7 @@ export default function FarmerDashboard() {
             </main>
 
             {/* Footer */}
-            <footer className="py-24 px-8 border-t border-emerald-50 bg-slate-50 relative z-10 mt-32">
+            <footer className="py-14 px-8 border-t border-emerald-50 bg-slate-50 relative z-10 mt-12">
                 <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-16">
                     <div className="col-span-1 md:col-span-2 space-y-8">
                         <div className="flex items-center gap-3">
@@ -881,11 +896,6 @@ export default function FarmerDashboard() {
                         </div>
                         <p className="text-slate-600 font-bold max-w-sm leading-relaxed text-lg italic">"விவசாயிகளின் முன்னேற்றமே நாட்டின் முதுகெலும்பு. நாங்கள் உங்களுடன் எப்போதும்!"</p>
                         <p className="text-slate-400 font-medium max-w-sm leading-relaxed text-sm">நேரடி நுகர்வோர் தளம் மூலம் விவசாயிகளை வலுப்படுத்துகிறோம். விவசாயிகளுக்காக பெருமையுடன் உருவாக்கப்பட்டது.</p>
-                        <div className="flex gap-4">
-                            {['Twitter', 'Instagram', 'Facebook', 'LinkedIn'].map(social => (
-                                <span key={social} className="w-10 h-10 rounded-full bg-white shadow-sm border border-slate-100 flex items-center justify-center text-slate-400 hover:text-emerald-600 cursor-pointer transition-all hover:-translate-y-1">{social.charAt(0)}</span>
-                            ))}
-                        </div>
                     </div>
                     <div className="space-y-6">
                         <h4 className="font-black uppercase tracking-widest text-[10px] text-emerald-600">Platform | தளம்</h4>
