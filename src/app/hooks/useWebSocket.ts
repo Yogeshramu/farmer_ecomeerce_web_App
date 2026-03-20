@@ -24,7 +24,16 @@ export interface AlertMessage {
     timestamp: string;
 }
 
-export type WebSocketMessage = OrderUpdateMessage | AlertMessage;
+export interface AuthSuccessMessage {
+    type: 'AUTH_SUCCESS';
+}
+
+export interface AuthErrorMessage {
+    type: 'AUTH_ERROR';
+    message?: string;
+}
+
+export type WebSocketMessage = OrderUpdateMessage | AlertMessage | AuthSuccessMessage | AuthErrorMessage;
 
 export interface UseWebSocketOptions {
     onOrderUpdate?: (orderId: string, update: any) => void;
