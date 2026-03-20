@@ -439,6 +439,37 @@ export default function FarmerDashboard() {
             </header>
 
             <main className="max-w-7xl mx-auto px-4 md:px-6 py-8 space-y-8">
+                <section className="relative overflow-hidden rounded-[30px] border border-emerald-200 bg-gradient-to-br from-emerald-900 via-emerald-800 to-lime-800 p-6 md:p-8 text-white shadow-2xl shadow-emerald-900/25">
+                    <div className="absolute -right-16 -top-16 h-52 w-52 rounded-full bg-lime-300/20 blur-2xl" aria-hidden="true" />
+                    <div className="absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-emerald-300/20 blur-2xl" aria-hidden="true" />
+
+                    <div className="relative z-10 space-y-6">
+                        <div className="space-y-2">
+                            <p className="text-[11px] uppercase tracking-[0.24em] font-black text-lime-100/85">Farmer Growth Stack</p>
+                            <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-tight">
+                                அறுவடையின் இதயத்தில்
+                                <br />
+                                தொழில்நுட்பம்.
+                            </h1>
+                        </div>
+
+                        <div className="grid gap-3 md:grid-cols-3">
+                            <div className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-sm">
+                                <p className="text-sm font-black text-lime-100">முன்கணிப்பு விலை | Predictive Pricing</p>
+                                <p className="mt-1 text-sm text-emerald-50/90 leading-relaxed">தூரம் சார்ந்த டெலிவரி கட்டணங்கள் மற்றும் சந்தை போக்கு பகுப்பாய்வு.</p>
+                            </div>
+                            <div className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-sm">
+                                <p className="text-sm font-black text-lime-100">உடனடி ஒத்திசைவு | Instant Sync</p>
+                                <p className="mt-1 text-sm text-emerald-50/90 leading-relaxed">ஆர்டர் அப்டேட்கள் மற்றும் அலர்ட்களை நிகழ்நேரத்தில் பெற WebSocket தொழில்நுட்பம்.</p>
+                            </div>
+                            <div className="rounded-2xl border border-white/20 bg-white/10 p-4 backdrop-blur-sm">
+                                <p className="text-sm font-black text-lime-100">தமிழ் மொழி ஆதரவு | Native Support</p>
+                                <p className="mt-1 text-sm text-emerald-50/90 leading-relaxed">தாய்மொழியிலேயே விற்பனை மற்றும் வாங்குதல் - அனைவருக்கும் எளிதான அணுகல்.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
                 {/* Stats */}
                 <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {[

@@ -1,24 +1,41 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getSession } from '@/lib/auth';
+import { jwtVerify } from 'jose';
+
+const secretKey = new TextEncoder().encode(process.env.JWT_SECRET || 'dev-secret-key');
+
+async function verifyAccessToken(token: string) {
+    try {
+        const { payload } = await jwtVerify(token, secretKey);
+        return payload;
+    } catch {
+        return null;
+    }
+}
 
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
+
+    const publicPaths = new Set([
+        '/',
+        '/farmer/login',
+        '/farmer/register',
+        '/consumer/login',
+        '/consumer/register'
+    ]);
     
     // Skip middleware for API routes, static files, and auth pages
     if (
         pathname.startsWith('/api/') ||
         pathname.startsWith('/_next/') ||
         pathname.startsWith('/static/') ||
-        pathname === '/farmer/login' ||
-        pathname === '/consumer/login' ||
-        pathname === '/consumer/register' ||
-        pathname === '/'
+        publicPaths.has(pathname)
     ) {
         return NextResponse.next();
     }
     
-    const session = await getSession();
+    const token = request.cookies.get('accessToken')?.value;
+    const session = token ? await verifyAccessToken(token) : null;
     
     // Redirect to login if not authenticated
     if (!session) {
@@ -32,10 +49,11 @@ export async function middleware(request: NextRequest) {
     
     // Role-based access control
     if (session) {
-        if (pathname.startsWith('/farmer/') && session.role !== 'FARMER') {
+        const role = session.role;
+        if (pathname.startsWith('/farmer/') && role !== 'FARMER') {
             return NextResponse.redirect(new URL('/consumer/dashboard', request.url));
         }
-        if (pathname.startsWith('/consumer/') && session.role !== 'CONSUMER') {
+        if (pathname.startsWith('/consumer/') && role !== 'CONSUMER') {
             return NextResponse.redirect(new URL('/farmer/dashboard', request.url));
         }
     }
