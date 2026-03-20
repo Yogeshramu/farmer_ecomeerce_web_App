@@ -18,6 +18,7 @@
     "seed": "npx tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@gradio/client": "^2.1.0",
     "@prisma/client": "^6.3.0",
     "@types/ws": "^8.18.1",
     "bcryptjs": "^2.4.3",

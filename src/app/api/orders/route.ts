@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { calculateDeliveryCharge } from '@/lib/deliveryCalculator';
+import { broadcastOrderUpdate, notifyFarmerOfNewOrder } from '@/lib/websocket-broadcast';
 
 interface GroupedItem {
     cropId: string;
@@ -115,6 +116,23 @@ export async function POST(request: Request) {
             }
 
             createdOrders.push(order);
+
+            // Get consumer name for notification
+            const consumer = await prisma.user.findUnique({
+                where: { id: session.id as string }
+            });
+
+            // Notify farmer of new order via WebSocket
+            if (consumer) {
+                await notifyFarmerOfNewOrder(farmerId, order.id, consumer.name);
+            }
+
+            // Broadcast the new order update
+            await broadcastOrderUpdate(order.id, {
+                status: order.status,
+                updatedAt: order.createdAt,
+                message: 'New order placed'
+            });
 
         }
 

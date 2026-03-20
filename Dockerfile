@@ -6,6 +6,10 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 
+# Install python and edge-tts for high-quality natural voice
+RUN apk add --no-cache python3 py3-pip
+RUN pip3 install edge-tts --break-system-packages
+
 # Install dependencies
 RUN npm ci
 

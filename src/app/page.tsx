@@ -205,7 +205,7 @@ export default function Home() {
                                 <div className="mt-1 p-1 bg-emerald-500/20 rounded-lg text-emerald-400"><Zap size={20} /></div>
                                 <div>
                                     <p className="font-bold text-xl">உடனடி ஒத்திசைவு | Instant Sync</p>
-                                    <p className="text-slate-400 text-sm font-medium mt-1 uppercase tracking-tight">ஆர্ডার அப்டேட்கள் மற்றும் அலர்ட்களை நிகழ்நேரத்தில் பெற WebSocket தொழில்நுட்பம்.</p>
+                                    <p className="text-slate-400 text-sm font-medium mt-1 uppercase tracking-tight">பயிர் விலை, ஆர்டர் நிலை மற்றும் டெலிவரி புதுப்பிப்புகள் நிমிஷங்களில் பெறுங்கள்.</p>
                                 </div>
                             </li>
                             <li className="flex gap-4 items-start">

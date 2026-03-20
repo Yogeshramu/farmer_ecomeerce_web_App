@@ -8,6 +8,7 @@ import { Button } from '@/app/components/ui/Button';
 import { Language } from '@/app/hooks/useVoiceInput';
 import { Package, Truck, CheckCircle, Clock, Volume2, Trash2, Pencil, Sparkles, MessageSquare, MapPin, TrendingUp, Leaf, Star, LogOut, Mic } from 'lucide-react';
 import { fetchWithAuth } from '@/lib/clientAuth';
+import { speakWithElevenLabs } from '@/app/utils/elevenLabsTTS';
 
 interface Crop {
     id: string;
@@ -151,7 +152,13 @@ export default function FarmerDashboard() {
                 if (!tokenRes.ok) return;
                 const { token } = await tokenRes.json();
 
-                ws = new WebSocket('ws://localhost:8080');
+                // Avoid browser WebSocket connection errors when WS server is down.
+                const wsBaseUrl = process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080';
+                const wsHttpHealthUrl = wsBaseUrl.replace(/^ws/, 'http') + '/health';
+                const healthRes = await fetch(wsHttpHealthUrl, { method: 'GET' });
+                if (!healthRes.ok) return;
+
+                ws = new WebSocket(wsBaseUrl);
 
                 ws.onopen = () => {
                     ws?.send(JSON.stringify({ type: 'AUTH', token }));
@@ -355,10 +362,29 @@ export default function FarmerDashboard() {
         }
     };
 
-    const speakOrder = (order: Order) => {
+    const speakOrder = async (order: Order) => {
         const text = `New Order. ${order.items?.length || 0} items. Total ${order.totalAmount} Rupees.`;
-        const utterance = new SpeechSynthesisUtterance(text);
-        window.speechSynthesis.speak(utterance);
+        console.log('[Dashboard] Speaking order info:', { text, orderId: order.id });
+        
+        try {
+            await speakWithElevenLabs(text, {
+                language: 'en-IN',
+                speed: 1.0,
+                onError: (error) => {
+                    console.error('[Dashboard] TTS Error for order:', {
+                        orderId: order.id,
+                        message: error instanceof Error ? error.message : String(error),
+                        type: error instanceof Error ? error.constructor.name : typeof error
+                    });
+                }
+            });
+        } catch (error) {
+            console.error('[Dashboard] Unexpected error speaking order:', {
+                orderId: order.id,
+                message: error instanceof Error ? error.message : String(error),
+                type: error instanceof Error ? error.constructor.name : typeof error
+            });
+        }
     };
 
     // Tab State

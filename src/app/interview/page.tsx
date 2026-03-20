@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/app/components/ui/Button';
 import { Mic, Square, ArrowRight, Volume2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { speakWithElevenLabs, stopSpeaking } from '@/app/utils/elevenLabsTTS';
 
 interface Question {
     id: string;
@@ -27,6 +28,11 @@ export default function InterviewPage() {
             .then(data => {
                 if (data.questions) setQuestions(data.questions);
             });
+
+        // Cleanup: stop any speaking audio when component unmounts
+        return () => {
+            stopSpeaking();
+        };
     }, []);
 
     const startRecording = useCallback(async () => {
@@ -49,26 +55,39 @@ export default function InterviewPage() {
         }
     }, []);
 
-    const speakQuestion = useCallback((text: string) => {
+    const speakQuestion = useCallback(async (text: string) => {
         if (typeof window === 'undefined') return;
-        window.speechSynthesis.cancel();
-
-        const voices = window.speechSynthesis.getVoices();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 1.0;
-
-        if (voices.length > 0) {
-            const preferredVoice = voices.find(v => v.lang.includes('en-IN')) || voices[0];
-            utterance.voice = preferredVoice;
-        }
-
-        utterance.onstart = () => setIsSpeaking(true);
-        utterance.onend = () => {
+        
+        setIsSpeaking(true);
+        console.log('[Interview] Starting to speak question:', text.substring(0, 50));
+        
+        try {
+            await speakWithElevenLabs(text, {
+                language: 'en-IN',
+                speed: 1.0,
+                onEnd: () => {
+                    console.log('[Interview] Speech ended, starting recording');
+                    setIsSpeaking(false);
+                    startRecording();
+                },
+                onError: (error) => {
+                    console.error('[Interview] TTS Error:', {
+                        message: error instanceof Error ? error.message : String(error),
+                        type: error instanceof Error ? error.constructor.name : typeof error
+                    });
+                    setIsSpeaking(false);
+                    startRecording();
+                }
+            });
+        } catch (error) {
+            console.error('[Interview] Unexpected error during speech:', {
+                message: error instanceof Error ? error.message : String(error),
+                type: error instanceof Error ? error.constructor.name : typeof error,
+                stack: error instanceof Error ? error.stack : undefined
+            });
             setIsSpeaking(false);
-            startRecording();
-        };
-
-        window.speechSynthesis.speak(utterance);
+            startRecording(); // Continue even if speech fails
+        }
     }, [startRecording]);
 
     useEffect(() => {

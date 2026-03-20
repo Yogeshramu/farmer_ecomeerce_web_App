@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { speakWithElevenLabs } from '../utils/elevenLabsTTS';
 
 // Types for Speech Recognition
 interface WindowWithSpeech extends Window {
@@ -25,20 +26,13 @@ export const useVoiceInput = (language: Language = 'ta-IN') => {
 
     const recognitionRef = useRef<any>(null);
     const recognitionActiveRef = useRef(false);
-    const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
     const mountedRef = useRef(true);
 
     useEffect(() => {
         mountedRef.current = true;
-        if (window.speechSynthesis) {
-            window.speechSynthesis.cancel();
-        }
 
         return () => {
             mountedRef.current = false;
-            if (window.speechSynthesis) {
-                window.speechSynthesis.cancel();
-            }
             if (recognitionRef.current) {
                 recognitionRef.current.onend = null;
                 recognitionRef.current.onerror = null;
@@ -52,106 +46,45 @@ export const useVoiceInput = (language: Language = 'ta-IN') => {
     const speak = useCallback(async (text: string, onEnd?: () => void) => {
         if (!mountedRef.current) return;
 
-        // 1. Try High-Quality AI Voice API first
-        const speakAI = async () => {
-            try {
-                const response = await fetch('/api/ai/tts', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text, language })
-                });
-
-                if (!response.ok) return false;
-
-                const blob = await response.blob();
-                const url = URL.createObjectURL(blob);
-                const audio = new Audio(url);
-
-                audio.onplay = () => setState(prev => ({ ...prev, isSpeaking: true }));
-                audio.onended = () => {
-                    URL.revokeObjectURL(url);
+        try {
+            await speakWithElevenLabs(text, {
+                language: language as 'en-IN' | 'ta-IN',
+                speed: 1.0,
+                onPlay: () => {
+                    if (mountedRef.current) {
+                        setState(prev => ({ ...prev, isSpeaking: true }));
+                    }
+                },
+                onEnd: () => {
                     if (mountedRef.current) {
                         setState(prev => ({ ...prev, isSpeaking: false }));
                         if (onEnd) onEnd();
                     }
-                };
-                audio.onerror = () => {
-                    URL.revokeObjectURL(url);
-                    return false;
-                };
-
-                await audio.play();
-                return true; // Success!
-            } catch (err) {
-                console.warn('AI TTS failed, falling back to native TTS...');
-                return false;
-            }
-        };
-
-        const speakNative = () => {
-            if (!window.speechSynthesis) return false;
-            window.speechSynthesis.cancel();
-
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = language;
-            utterance.rate = 1.0;
-            utterance.pitch = 1.1;
-
-            const voices = window.speechSynthesis.getVoices();
-            let selectedVoice = voices.find(v => v.name.includes('Google') && v.lang.startsWith(language.split('-')[0]));
-            if (!selectedVoice) selectedVoice = voices.find(v => v.lang.startsWith(language.split('-')[0]));
-            if (selectedVoice) utterance.voice = selectedVoice;
-
-            utterance.onstart = () => {
-                if (mountedRef.current) setState(prev => ({ ...prev, isSpeaking: true }));
-            };
-
-            utterance.onend = () => {
-                if (mountedRef.current) {
-                    setState(prev => ({ ...prev, isSpeaking: false }));
-                    if (onEnd) onEnd();
-                }
-            };
-
-            utterance.onerror = (e: any) => {
-                if (e.error !== 'canceled' && e.error !== 'interrupted') {
-                    console.warn('Native TTS failed, trying fallback...', e);
-                    speakFallback();
-                }
-            };
-
-            utteranceRef.current = utterance;
-            window.speechSynthesis.speak(utterance);
-            return true;
-        };
-
-        const speakFallback = () => {
-            try {
-                const langCode = language.split('-')[0];
-                const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${langCode}&q=${encodeURIComponent(text)}`;
-                const audio = new Audio(url);
-                audio.onplay = () => setState(prev => ({ ...prev, isSpeaking: true }));
-                audio.onended = () => {
+                },
+                onError: (error) => {
+                    const errorInfo = {
+                        message: error instanceof Error ? error.message : String(error),
+                        type: error instanceof Error ? error.constructor.name : typeof error,
+                        details: error
+                    };
+                    console.error('[Hook] ElevenLabs TTS error:', errorInfo);
                     if (mountedRef.current) {
                         setState(prev => ({ ...prev, isSpeaking: false }));
                         if (onEnd) onEnd();
                     }
-                };
-                audio.onerror = () => {
-                    setState(prev => ({ ...prev, isSpeaking: false }));
-                    if (onEnd) onEnd();
-                };
-                audio.play();
-            } catch (err) {
+                }
+            });
+        } catch (error) {
+            const errorInfo = {
+                message: error instanceof Error ? error.message : String(error),
+                type: error instanceof Error ? error.constructor.name : typeof error,
+                stack: error instanceof Error ? error.stack : undefined
+            };
+            console.error('[Hook] Failed to speak:', errorInfo);
+            if (mountedRef.current) {
                 setState(prev => ({ ...prev, isSpeaking: false }));
                 if (onEnd) onEnd();
             }
-        };
-
-        const aiStarted = await speakAI();
-        if (!aiStarted) {
-            const nativeStarted = speakNative();
-            if (!nativeStarted) speakFallback();
         }
     }, [language]);
 
