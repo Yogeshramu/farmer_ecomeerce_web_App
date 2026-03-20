@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
-import { spawn } from 'child_process';
+import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
+
+export const maxDuration = 60;
 
 const VOICE_MAP: Record<string, string> = {
     'ta-IN': 'ta-IN-ValluvarNeural',   // Natural Tamil male voice
@@ -10,38 +12,32 @@ const VOICE_MAP: Record<string, string> = {
 async function getEdgeTTS(text: string, language: string): Promise<Buffer> {
     const voice = VOICE_MAP[language] || VOICE_MAP['default'];
     
-    return new Promise((resolve, reject) => {
-        // Run the python edge_tts package that bypasses 403 errors
-        const pyProcess = spawn('python3', [
-            '-m', 'edge_tts', 
-            '--text', text,
-            '--voice', voice,
-            '--write-media', '/dev/stdout'
-        ]);
-
-        const audioChunks: Buffer[] = [];
-        const errorChunks: Buffer[] = [];
-
-        pyProcess.stdout.on('data', (chunk) => {
-            audioChunks.push(chunk);
-        });
-
-        pyProcess.stderr.on('data', (chunk) => {
-            errorChunks.push(chunk);
-        });
-
-        pyProcess.on('close', (code) => {
-            if (code === 0 && audioChunks.length > 0) {
-                resolve(Buffer.concat(audioChunks));
-            } else {
-                const errText = Buffer.concat(errorChunks).toString();
-                reject(new Error(`Edge TTS failed (code ${code}): ${errText}`));
-            }
-        });
-
-        pyProcess.on('error', (err) => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const tts = new MsEdgeTTS();
+            await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+            
+            const { audioStream } = tts.toStream(text);
+            const chunks: Buffer[] = [];
+            
+            audioStream.on('data', (chunk) => {
+                chunks.push(chunk);
+            });
+            
+            audioStream.on('close', () => {
+                if (chunks.length > 0) {
+                    resolve(Buffer.concat(chunks));
+                } else {
+                    reject(new Error("Edge TTS returned no audio data."));
+                }
+            });
+            
+            audioStream.on('error', (err) => {
+                reject(err);
+            });
+        } catch (err) {
             reject(err);
-        });
+        }
     });
 }
 
