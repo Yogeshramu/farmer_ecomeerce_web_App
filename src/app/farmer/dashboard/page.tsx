@@ -110,6 +110,14 @@ export default function FarmerDashboard() {
     const [socket, setSocket] = useState<WebSocket | null>(null);
     const [wsConnected, setWsConnected] = useState(false);
 
+    const fetchOrders = useCallback(async () => {
+        try {
+            const res = await fetchWithAuth('/api/orders');
+            const data = await res.json();
+            if (data.orders) setOrders(data.orders);
+        } catch {}
+    }, []);
+
     const fetchData = useCallback(async () => {
         try {
             const [ordersRes, cropsRes, inquiriesRes, reviewsRes] = await Promise.all([
@@ -649,7 +657,7 @@ export default function FarmerDashboard() {
                         )}
 
                         {activeTab === 'cluster' && (
-                            <ClusterDeliveryTab orders={orders} updateStatus={updateStatus} fetchData={fetchData} currentFarmerId={user?.id || ''} isActive={activeTab === 'cluster'} />
+                            <ClusterDeliveryTab orders={orders} updateStatus={updateStatus} fetchOrders={fetchOrders} currentFarmerId={user?.id || ''} isActive={activeTab === 'cluster'} />
                         )}
 
                         {activeTab === 'add' && (
@@ -1008,10 +1016,10 @@ interface Handoff {
     acceptingFarmer?: { id: string; name: string; pincode?: string };
 }
 
-function ClusterDeliveryTab({ orders, updateStatus, fetchData, currentFarmerId, isActive }: {
+function ClusterDeliveryTab({ orders, updateStatus, fetchOrders, currentFarmerId, isActive }: {
     orders: Order[];
     updateStatus: (id: string, status: string) => Promise<void>;
-    fetchData: () => void;
+    fetchOrders: () => void;
     currentFarmerId: string;
     isActive: boolean;
 }) {
@@ -1027,17 +1035,17 @@ function ClusterDeliveryTab({ orders, updateStatus, fetchData, currentFarmerId, 
         if (data.incomingRequests) setIncomingRequests(data.incomingRequests);
     }, []);
 
-    // Initial fetch + poll every 5s only while cluster tab is active
+    // Poll only handoffs + orders every 5s while cluster tab is active
     useEffect(() => {
         if (!isActive) return;
         fetchHandoffs();
-        fetchData(); // sync orders too on tab open
-        const interval = setInterval(async () => {
-            await fetchHandoffs();
-            await fetchData(); // keep orders in sync
+        fetchOrders();
+        const interval = setInterval(() => {
+            fetchHandoffs();
+            fetchOrders();
         }, 5000);
         return () => clearInterval(interval);
-    }, [isActive, fetchHandoffs, fetchData]);
+    }, [isActive, fetchHandoffs, fetchOrders]);
 
     // Group ACCEPTED orders by deliveryPincode (exclude DELIVERED)
     const acceptedOrders = orders.filter(o => o.status === 'ACCEPTED' && o.deliveryPincode);
@@ -1063,7 +1071,7 @@ function ClusterDeliveryTab({ orders, updateStatus, fetchData, currentFarmerId, 
             await updateStatus(order.id, 'OUT_FOR_DELIVERY');
         }
         setDelivering(null);
-        fetchData();
+        fetchOrders();
     };
 
     const completeCluster = async (pincode: string, clusterOrders: Order[]) => {
@@ -1072,7 +1080,7 @@ function ClusterDeliveryTab({ orders, updateStatus, fetchData, currentFarmerId, 
             await updateStatus(order.id, 'DELIVERED');
         }
         setDelivering(null);
-        fetchData();
+        fetchOrders();
     };
 
     const requestHandoff = async (pincode: string) => {
@@ -1094,7 +1102,7 @@ function ClusterDeliveryTab({ orders, updateStatus, fetchData, currentFarmerId, 
             body: JSON.stringify({ action })
         });
         await fetchHandoffs();
-        await fetchData();
+        await fetchOrders();
         setHandoffLoading(null);
     };
 
