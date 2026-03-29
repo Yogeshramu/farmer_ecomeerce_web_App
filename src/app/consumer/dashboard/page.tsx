@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/app/components/ui/Button';
-import { ShoppingCart, MapPin, Clock, Package, Truck, CheckCircle, Leaf, Star } from 'lucide-react';
+import { ShoppingCart, MapPin, Clock, Package, Truck, CheckCircle, Leaf, Star, Route } from 'lucide-react';
 import { fetchWithAuth } from '@/lib/clientAuth';
 
 interface Crop {
@@ -358,33 +358,27 @@ export default function ConsumerDashboard() {
                     </div>
                     <div className="flex flex-col">
                         <span className="text-2xl font-black tracking-tighter text-blue-950 leading-none">FarmDirect</span>
-                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">நுகர்வோர் / Consumer</span>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Consumer</span>
                     </div>
                 </div>
 
                 <div className="flex gap-2 sm:gap-4 items-center">
-                    <button onClick={() => setView('market')} className={`flex flex-col items-center px-4 py-2 rounded-xl transition-all ${view === 'market' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-500 hover:text-blue-600 hover:bg-slate-50'}`}>
-                        <span>சந்தை</span>
-                        <span className="text-[9px] uppercase tracking-wider opacity-70">Market</span>
+                    <button onClick={() => setView('market')} className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-semibold text-sm transition-all ${view === 'market' ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:text-blue-600 hover:bg-slate-50'}`}>
+                        Market
                     </button>
-                    <button onClick={() => setView('orders')} className={`flex flex-col items-center px-4 py-2 rounded-xl transition-all ${view === 'orders' ? 'bg-blue-50 text-blue-700 font-bold' : 'text-slate-500 hover:text-blue-600 hover:bg-slate-50'}`}>
-                        <span>ஆர்டர்கள்</span>
-                        <span className="text-[9px] uppercase tracking-wider opacity-70">Orders</span>
+                    <button onClick={() => setView('orders')} className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-semibold text-sm transition-all ${view === 'orders' ? 'bg-blue-50 text-blue-700' : 'text-slate-500 hover:text-blue-600 hover:bg-slate-50'}`}>
+                        Orders
                     </button>
-                    <button onClick={() => setView('cart')} className="relative flex flex-col items-center px-4 py-2 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-200 hover:bg-blue-700 hover:scale-105 transition-all">
-                        <div className="flex items-center gap-2">
-                            <span>கூடை</span>
-                            <ShoppingCart size={16} />
-                        </div>
-                        <span className="text-[9px] uppercase tracking-wider opacity-80 mt-0.5">Cart</span>
+                    <button onClick={() => setView('cart')} className="relative flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-200 hover:bg-blue-700 hover:scale-105 transition-all font-semibold text-sm">
+                        <ShoppingCart size={16} />
+                        Cart
                         {cart.length > 0 && <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center border-2 border-white animate-bounce">{cart.length}</span>}
                     </button>
                     <button onClick={async () => {
                         await fetch('/api/auth/logout', { method: 'POST' });
                         window.location.href = '/';
-                    }} className="flex flex-col items-center px-4 py-2 rounded-xl text-red-500 hover:bg-red-50 hover:text-red-700 transition-all border border-transparent hover:border-red-100 ml-2 hidden sm:flex">
-                        <span>வெளியேறு</span>
-                        <span className="text-[9px] uppercase tracking-wider opacity-70">Logout</span>
+                    }} className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 hover:text-red-700 transition-all border border-transparent hover:border-red-100 ml-2 hidden sm:flex">
+                        Logout
                     </button>
                 </div>
             </header>
@@ -605,7 +599,14 @@ export default function ConsumerDashboard() {
                                                 return (
                                                     <div className="text-right">
                                                         <span className="font-bold text-blue-600">₹{deliveryCharge}</span>
-                                                        <p className="text-xs text-slate-400">{distanceKm} km × ₹10</p>
+                                                        <div className="flex items-center gap-1.5 mt-1 justify-end">
+                                                            <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-100 text-blue-700 font-bold text-xs px-2 py-0.5 rounded-full">
+                                                                <Route size={10} /> {distanceKm} km
+                                                            </span>
+                                                            <span className="inline-flex items-center bg-slate-100 text-slate-800 font-bold text-xs px-2 py-0.5 rounded-full">
+                                                                ₹{deliveryCharge} delivery
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 );
                                             })()}
@@ -685,7 +686,7 @@ export default function ConsumerDashboard() {
                                                             <Star key={s} size={14} fill={s <= order.review!.rating ? "currentColor" : "none"} />
                                                         ))}
                                                     </div>
-                                                    <span className="text-xs font-bold text-slate-400">Rating Provided | மதிப்பீடு வழங்கப்பட்டது</span>
+                                                    <span className="text-xs font-bold text-slate-400">Rating Provided</span>
                                                 </div>
                                             ) : (
                                                 <Button 
@@ -694,7 +695,7 @@ export default function ConsumerDashboard() {
                                                     onClick={() => setReviewModal({ isOpen: true, order, rating: 5, comment: '' })}
                                                     className="w-full bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100 font-bold"
                                                 >
-                                                    மதிப்பீடு வழங்கவும் / Add Review
+                                                    Add Review
                                                 </Button>
                                             )}
                                         </div>
@@ -788,7 +789,7 @@ export default function ConsumerDashboard() {
                                 <Star size={32} />
                             </div>
                             <h3 className="text-2xl font-black text-slate-900 tracking-tight">How was the crop?</h3>
-                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">உங்கள் கருத்துக்களை பகிரவும்</p>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">Share your feedback</p>
                             <p className="text-sm text-slate-500 mt-2">Rate your purchase from {reviewModal.order.farmer.name}</p>
                         </div>
                         
@@ -806,7 +807,7 @@ export default function ConsumerDashboard() {
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Comments / கருத்துக்கள்</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Comments</label>
                                 <textarea
                                     className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-4 focus:ring-blue-100 focus:bg-white focus:border-blue-500 transition-all resize-none text-slate-700 font-medium"
                                     placeholder="Tell us about the quality and freshness..."
@@ -847,11 +848,11 @@ export default function ConsumerDashboard() {
                             </div>
                             <span className="text-xl font-black tracking-tighter text-blue-950">FarmDirect</span>
                         </div>
-                        <p className="text-slate-800 font-bold max-w-xs leading-relaxed">நேரடி நுகர்வோர் டிஜிட்டல் தளம் மூலம் விவசாய சமூகத்தை வலுப்படுத்துகிறோம். விவசாயிகளுக்காக பெருமையுடன் உருவாக்கப்பட்டது.</p>
+                        <p className="text-slate-800 font-bold max-w-xs leading-relaxed">Empowering the farming community through a direct consumer digital platform. Proudly built for farmers.</p>
                         <p className="text-slate-400 italic">"Empowering farmers through direct digital infrastructure."</p>
                     </div>
                     <div className="space-y-4">
-                        <h4 className="font-bold uppercase tracking-widest text-xs text-slate-900">Platform | தளம்</h4>
+                        <h4 className="font-bold uppercase tracking-widest text-xs text-slate-900">Platform</h4>
                         <ul className="text-slate-500 space-y-3 font-medium">
                             <li className="hover:text-blue-600 cursor-pointer transition-colors">Farmer Portal</li>
                             <li className="hover:text-blue-600 cursor-pointer transition-colors">Consumer App</li>
@@ -859,7 +860,7 @@ export default function ConsumerDashboard() {
                         </ul>
                     </div>
                     <div className="space-y-4">
-                        <h4 className="font-bold uppercase tracking-widest text-xs text-slate-900">Legal | சட்டம்</h4>
+                        <h4 className="font-bold uppercase tracking-widest text-xs text-slate-900">Legal</h4>
                         <ul className="text-slate-500 space-y-3 font-medium">
                             <li className="hover:text-blue-600 cursor-pointer transition-colors">Terms of Service</li>
                             <li className="hover:text-blue-600 cursor-pointer transition-colors">Privacy Policy</li>
@@ -868,7 +869,7 @@ export default function ConsumerDashboard() {
                     </div>
                 </div>
                 <div className="max-w-6xl mx-auto pt-20 border-t border-slate-200 mt-10 flex flex-col md:flex-row justify-between items-center text-[10px] text-slate-400 font-bold uppercase tracking-widest gap-4">
-                    <span>© 2026 FarmDirect Project. விவசாயிகளின் உழைப்பு, உங்கள் வீட்டில்.</span>
+                    <span>© 2026 FarmDirect Project. Farmer's effort, at your doorstep.</span>
                     <div className="flex gap-6">
                         <span className="hover:text-blue-600 cursor-pointer transition-colors">Instagram</span>
                         <span className="hover:text-blue-600 cursor-pointer transition-colors">Twitter</span>

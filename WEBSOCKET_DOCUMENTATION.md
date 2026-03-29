@@ -352,3 +352,7 @@ wscat -c ws://localhost:8080
 - `src/app/hooks/useWebSocket.ts` - React hook for client integration
 - `src/app/api/orders/route.ts` - Updated to notify on new orders
 - `src/app/api/orders/[id]/status/route.ts` - Updated to broadcast status changes
+\
+
+
+

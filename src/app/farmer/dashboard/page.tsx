@@ -6,7 +6,7 @@ import VoiceFarmingInsights from '@/app/components/VoiceFarmingInsights';
 import PriceInsightsChart from '@/app/components/PriceInsightsChart';
 import { Button } from '@/app/components/ui/Button';
 import { Language } from '@/app/hooks/useVoiceInput';
-import { Package, Truck, CheckCircle, Clock, Volume2, Trash2, Pencil, Sparkles, MessageSquare, MapPin, TrendingUp, Leaf, Star, LogOut, Mic } from 'lucide-react';
+import { Package, Truck, CheckCircle, Clock, Volume2, Trash2, Pencil, Sparkles, MessageSquare, MapPin, TrendingUp, Leaf, Star, LogOut, Mic, Route } from 'lucide-react';
 import { fetchWithAuth } from '@/lib/clientAuth';
 import { speakWithElevenLabs } from '@/app/utils/elevenLabsTTS';
 
@@ -86,7 +86,7 @@ interface Inquiry {
 export default function FarmerDashboard() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [inquiries, setInquiries] = useState<Inquiry[]>([]);
-    const [user, setUser] = useState<{ id: string, name: string } | null>(null);
+    const [user, setUser] = useState<{ id: string, name: string, pincode?: string } | null>(null);
     const [reviews, setReviews] = useState<Review[]>([]);
     const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
@@ -94,7 +94,7 @@ export default function FarmerDashboard() {
         setToast({ message, type });
         setTimeout(() => setToast(null), 3000);
     };
-    const [pincode] = useState('600001');
+
 
     // Crop form
     const [cropName, setCropName] = useState('');
@@ -283,7 +283,7 @@ export default function FarmerDashboard() {
         if (wsConnected && socket && socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({
                 type: 'ADD_CROP',
-                crop: { name: data.name, quantityKg: data.quantityKg, basePrice: data.basePrice, farmerPincode: pincode }
+                crop: { name: data.name, quantityKg: data.quantityKg, basePrice: data.basePrice, farmerPincode: user?.pincode }
             }));
             // Rest of logic handled in onmessage
             return;
@@ -292,7 +292,7 @@ export default function FarmerDashboard() {
         try {
             await fetch('/api/crops', {
                 method: 'POST',
-                body: JSON.stringify({ name: data.name, quantityKg: data.quantityKg, basePrice: data.basePrice, farmerPincode: pincode }),
+                body: JSON.stringify({ name: data.name, quantityKg: data.quantityKg, basePrice: data.basePrice, farmerPincode: user?.pincode }),
                 headers: { 'Content-Type': 'application/json' }
             });
             setCropName('');
@@ -314,7 +314,7 @@ export default function FarmerDashboard() {
         if (wsConnected && socket && socket.readyState === WebSocket.OPEN) {
             socket.send(JSON.stringify({
                 type: 'ADD_CROP',
-                crop: { name: cropName, quantityKg: quantity, basePrice: basePrice, farmerPincode: pincode }
+                crop: { name: cropName, quantityKg: quantity, basePrice: basePrice, farmerPincode: user?.pincode }
             }));
             // Rest of logic handled in onmessage
             return;
@@ -323,7 +323,7 @@ export default function FarmerDashboard() {
         try {
             await fetch('/api/crops', {
                 method: 'POST',
-                body: JSON.stringify({ name: cropName, quantityKg: quantity, basePrice, farmerPincode: pincode }),
+                body: JSON.stringify({ name: cropName, quantityKg: quantity, basePrice, farmerPincode: user?.pincode }),
                 headers: { 'Content-Type': 'application/json' }
             });
             setCropName('');
@@ -388,7 +388,7 @@ export default function FarmerDashboard() {
     };
 
     // Tab State
-    const [activeTab, setActiveTab] = useState<'orders' | 'add' | 'insights' | 'listings' | 'inquiries' | 'prices' | 'reviews'>('orders');
+    const [activeTab, setActiveTab] = useState<'orders' | 'cluster' | 'add' | 'insights' | 'listings' | 'inquiries' | 'prices' | 'reviews'>('orders');
     const [addMode, setAddMode] = useState<'voice' | 'manual'>('voice');
     const [voiceLanguage, setVoiceLanguage] = useState<Language>('ta-IN');
     const [insightLanguage, setInsightLanguage] = useState<Language>('ta-IN');
@@ -411,13 +411,14 @@ export default function FarmerDashboard() {
     };
 
     const tabs: Array<{
-        id: 'orders' | 'add' | 'insights' | 'listings' | 'inquiries' | 'prices' | 'reviews';
+        id: 'orders' | 'cluster' | 'add' | 'insights' | 'listings' | 'inquiries' | 'prices' | 'reviews';
         label: string;
         subtitle: string;
         icon: typeof Truck;
         badge?: number;
     }> = [
         { id: 'orders', label: 'ஆர்டர் மையம்', subtitle: 'நிலை & செயல்கள்', icon: Truck, badge: orders.filter((o) => o.status !== 'DELIVERED').length },
+        { id: 'cluster', label: 'கிளஸ்டர் டெலிவரி', subtitle: 'பகுதி வழி திட்டம்', icon: Route, badge: (() => { const active = orders.filter(o => (o.status === 'ACCEPTED' || o.status === 'OUT_FOR_DELIVERY') && o.deliveryPincode); const pins = [...new Set(active.map(o => o.deliveryPincode))]; return pins.filter(p => active.filter(o => o.deliveryPincode === p).length >= 1).length; })() },
         { id: 'add', label: 'பயிர் சேர்க்க', subtitle: 'குரல் அல்லது படிவம்', icon: Sparkles },
         { id: 'insights', label: 'குரல் ஆலோசனை', subtitle: 'விவசாய நுண்ணறிவு', icon: Mic },
         { id: 'listings', label: 'நேரடி பட்டியல்', subtitle: 'சரக்கு பலகை', icon: Package, badge: allCrops.length },
@@ -452,7 +453,7 @@ export default function FarmerDashboard() {
                     <div className="flex items-center gap-4">
                         <div className="hidden md:flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 px-3 py-1.5 rounded-full">
                             <MapPin size={12} className="text-emerald-600" />
-                            <span className="text-xs font-bold text-emerald-700">{pincode}</span>
+                            <span className="text-xs font-bold text-emerald-700">{user?.pincode || '—'}</span>
                         </div>
                         {user && <span className="hidden md:block text-sm font-semibold text-slate-600">{user.name}</span>}
                         <button onClick={async () => { await fetch('/api/auth/logout', { method: 'POST' }); window.location.href = '/'; }}
@@ -643,6 +644,10 @@ export default function FarmerDashboard() {
                                     </div>
                                 )}
                             </section>
+                        )}
+
+                        {activeTab === 'cluster' && (
+                            <ClusterDeliveryTab orders={orders} updateStatus={updateStatus} fetchData={fetchData} currentFarmerId={user?.id || ''} />
                         )}
 
                         {activeTab === 'add' && (
@@ -989,4 +994,352 @@ function StatusIcon({ status }: { status: string }) {
     if (status === 'ACCEPTED') return <div className="p-2.5 bg-blue-50 text-blue-500 rounded-2xl ring-2 ring-blue-100 shadow-sm shadow-blue-200/50"><Package size={22} /></div>;
     if (status === 'OUT_FOR_DELIVERY') return <div className="p-2.5 bg-purple-50 text-purple-500 rounded-2xl ring-2 ring-purple-100 shadow-sm shadow-purple-200/50"><Truck size={22} /></div>;
     return <div className="p-2.5 bg-emerald-50 text-emerald-500 rounded-2xl ring-2 ring-emerald-100 shadow-sm shadow-emerald-200/50"><CheckCircle size={22} /></div>;
+}
+
+interface Handoff {
+    id: string;
+    clusterPincode: string;
+    status: string;
+    goodsSentByA: boolean;
+    goodsSentByB: boolean;
+    requestingFarmer?: { id: string; name: string; pincode?: string };
+    acceptingFarmer?: { id: string; name: string; pincode?: string };
+}
+
+function ClusterDeliveryTab({ orders, updateStatus, fetchData, currentFarmerId }: {
+    orders: Order[];
+    updateStatus: (id: string, status: string) => Promise<void>;
+    fetchData: () => void;
+    currentFarmerId: string;
+}) {
+    const [delivering, setDelivering] = useState<string | null>(null);
+    const [myRequests, setMyRequests] = useState<Handoff[]>([]);
+    const [incomingRequests, setIncomingRequests] = useState<Handoff[]>([]);
+    const [handoffLoading, setHandoffLoading] = useState<string | null>(null);
+
+    const fetchHandoffs = useCallback(async () => {
+        const res = await fetchWithAuth('/api/delivery-handoff');
+        const data = await res.json();
+        if (data.myRequests) setMyRequests(data.myRequests);
+        if (data.incomingRequests) setIncomingRequests(data.incomingRequests);
+    }, []);
+
+    useEffect(() => { fetchHandoffs(); }, [fetchHandoffs]);
+
+    // Group ACCEPTED orders by deliveryPincode (exclude DELIVERED)
+    const acceptedOrders = orders.filter(o => o.status === 'ACCEPTED' && o.deliveryPincode);
+    const clusters: Record<string, Order[]> = {};
+    for (const order of acceptedOrders) {
+        const pin = order.deliveryPincode!;
+        if (!clusters[pin]) clusters[pin] = [];
+        clusters[pin].push(order);
+    }
+
+    // OUT_FOR_DELIVERY clusters (exclude DELIVERED)
+    const outOrders = orders.filter(o => o.status === 'OUT_FOR_DELIVERY' && o.deliveryPincode);
+    const outClusters: Record<string, Order[]> = {};
+    for (const order of outOrders) {
+        const pin = order.deliveryPincode!;
+        if (!outClusters[pin]) outClusters[pin] = [];
+        outClusters[pin].push(order);
+    }
+
+    const deliverCluster = async (pincode: string, clusterOrders: Order[]) => {
+        setDelivering(pincode);
+        for (const order of clusterOrders) {
+            await updateStatus(order.id, 'OUT_FOR_DELIVERY');
+        }
+        setDelivering(null);
+        fetchData();
+    };
+
+    const completeCluster = async (pincode: string, clusterOrders: Order[]) => {
+        setDelivering(pincode + '_done');
+        for (const order of clusterOrders) {
+            await updateStatus(order.id, 'DELIVERED');
+        }
+        setDelivering(null);
+        fetchData();
+    };
+
+    const requestHandoff = async (pincode: string) => {
+        setHandoffLoading('req_' + pincode);
+        await fetchWithAuth('/api/delivery-handoff', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ clusterPincode: pincode })
+        });
+        await fetchHandoffs();
+        setHandoffLoading(null);
+    };
+
+    const respondHandoff = async (handoffId: string, action: 'ACCEPT' | 'REJECT' | 'GOODS_SENT_BY_A' | 'GOODS_SENT_BY_B') => {
+        setHandoffLoading(handoffId);
+        await fetchWithAuth(`/api/delivery-handoff/${handoffId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action })
+        });
+        await fetchHandoffs();
+        await fetchData();
+        setHandoffLoading(null);
+    };
+
+    const totalClusters = Object.keys(clusters).length + Object.keys(outClusters).length;
+
+    return (
+        <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div>
+                <p className="text-[10px] uppercase tracking-[0.2em] font-black text-purple-600">Dijkstra Cluster Routing</p>
+                <h2 className="text-2xl font-black text-slate-900 tracking-tight">கிளஸ்டர் டெலிவரி</h2>
+                <p className="text-sm text-slate-500 mt-1">ஒரே பகுதியில் உள்ள ஆர்டர்கள் தானாக குழுவாக்கப்படுகின்றன — ஒரே பயணத்தில் அனைத்தையும் வழங்கவும்.</p>
+            </div>
+
+            {/* Info Banner */}
+            <div className="rounded-2xl border border-purple-200 bg-purple-50 p-4 flex gap-3 items-start">
+                <Route size={20} className="text-purple-600 shrink-0 mt-0.5" />
+                <div className="text-sm text-purple-800">
+                    <p className="font-black">Cluster Logic (Dijkstra-based) + Farmer Handoff</p>
+                    <p className="mt-0.5 font-medium">Same pincode orders → ஒரே cluster. நீங்கள் deliver பண்ண முடியாவிட்டால் மற்றொரு farmer-க்கு handoff request அனுப்பலாம். Accept ஆனதும் lock ஆகும் — மேலும் reassign இல்லை.</p>
+                </div>
+            </div>
+
+            {/* ── INCOMING HANDOFF REQUESTS (Farmer B view) ── */}
+            {incomingRequests.filter(r => !r.goodsSentByB).length > 0 && (
+                <div className="space-y-3">
+                    <p className="text-xs font-black uppercase tracking-widest text-orange-600">📬 உங்களுக்கு வந்த Handoff கோரிக்கைகள்</p>
+                    {incomingRequests.filter(r => !r.goodsSentByB).map(req => {
+                        const step = req.goodsSentByB ? 4 : req.goodsSentByA ? 3 : req.status === 'LOCKED' ? 2 : 1;
+                        return (
+                            <div key={req.id} className="rounded-2xl border-2 border-orange-200 bg-white p-4 space-y-3">
+                                <div className="flex items-start justify-between gap-4 flex-wrap">
+                                    <div>
+                                        <p className="font-black text-slate-900">{req.requestingFarmer?.name} கோரிக்கை அனுப்பினார்</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">Cluster Pincode: <span className="font-bold">{req.clusterPincode}</span></p>
+                                    </div>
+                                    <HandoffStepBadge step={step} role="B" />
+                                </div>
+
+                                {/* Step 1: Farmer B accepts/rejects */}
+                                {step === 1 && (
+                                    <div className="flex gap-2">
+                                        <button
+                                            onClick={() => respondHandoff(req.id, 'ACCEPT')}
+                                            disabled={handoffLoading === req.id}
+                                            className="flex-1 bg-emerald-600 text-white font-black text-xs uppercase px-3 py-2.5 rounded-xl hover:bg-emerald-700 disabled:opacity-60 flex items-center justify-center gap-1"
+                                        >
+                                            <CheckCircle size={13} />
+                                            {handoffLoading === req.id ? '...' : 'Accept'}
+                                        </button>
+                                        <button
+                                            onClick={() => respondHandoff(req.id, 'REJECT')}
+                                            disabled={handoffLoading === req.id}
+                                            className="flex-1 bg-white border border-red-200 text-red-600 font-black text-xs uppercase px-3 py-2.5 rounded-xl hover:bg-red-50 disabled:opacity-60"
+                                        >
+                                            Reject
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Step 2: Waiting for Farmer A to send goods */}
+                                {step === 2 && (
+                                    <p className="text-xs font-bold text-blue-700 bg-blue-50 rounded-xl px-3 py-2">
+                                        ⏳ {req.requestingFarmer?.name} பொருள் அனுப்புவார் — காத்திருக்கிறேன்...
+                                    </p>
+                                )}
+
+                                {/* Step 3: Farmer A sent goods, Farmer B confirms receipt + dispatch */}
+                                {step === 3 && (
+                                    <button
+                                        onClick={() => respondHandoff(req.id, 'GOODS_SENT_BY_B')}
+                                        disabled={handoffLoading === req.id}
+                                        className="w-full bg-purple-600 text-white font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl hover:bg-purple-700 disabled:opacity-60 flex items-center justify-center gap-2"
+                                    >
+                                        <Truck size={14} />
+                                        {handoffLoading === req.id ? 'Dispatching...' : '🚚 Goods Received & Dispatched to Consumer'}
+                                    </button>
+                                )}
+
+                                {/* Step 4: Done */}
+                                {step === 4 && (
+                                    <p className="text-xs font-bold text-emerald-700 bg-emerald-50 rounded-xl px-3 py-2">
+                                        ✅ ஆர்டர் வழங்கப்பட்டது — Order Delivered
+                                    </p>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {/* ── MY SENT HANDOFF REQUESTS (Farmer A view) ── */}
+            {myRequests.filter(r => r.status !== 'REJECTED' && !r.goodsSentByB).length > 0 && (
+                <div className="space-y-2">
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-500">📤 நீங்கள் அனுப்பிய Handoff கோரிக்கைகள்</p>
+                    {myRequests.filter(r => r.status !== 'REJECTED' && !r.goodsSentByB).map(req => {
+                        // Derive step for Farmer A
+                        const step = req.goodsSentByB ? 4 : req.goodsSentByA ? 3 : req.status === 'LOCKED' ? 2 : 1;
+                        return (
+                            <div key={req.id} className="rounded-xl border border-slate-200 bg-white px-4 py-4 space-y-3">
+                                <div className="flex items-center justify-between gap-3 flex-wrap">
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-800">Cluster Pincode: {req.clusterPincode}</p>
+                                        {req.acceptingFarmer && <p className="text-xs text-slate-500">Accepted by: <span className="font-bold">{req.acceptingFarmer.name}</span></p>}
+                                    </div>
+                                    <HandoffStepBadge step={step} role="A" />
+                                </div>
+                                {/* Farmer A action: send goods after Farmer B accepts */}
+                                {step === 2 && (
+                                    <button
+                                        onClick={() => respondHandoff(req.id, 'GOODS_SENT_BY_A')}
+                                        disabled={handoffLoading === req.id}
+                                        className="w-full bg-blue-600 text-white font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl hover:bg-blue-700 disabled:opacity-60 flex items-center justify-center gap-2"
+                                    >
+                                        <Package size={14} />
+                                        {handoffLoading === req.id ? 'Confirming...' : '📦 Goods Sent to Farmer B'}
+                                    </button>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+
+            {totalClusters === 0 ? (
+                <div className="text-center py-20 bg-slate-50 rounded-3xl border border-dashed border-slate-200">
+                    <Route className="mx-auto text-slate-300 mb-4" size={42} />
+                    <h3 className="text-lg font-black text-slate-900">Cluster இல்லை</h3>
+                    <p className="text-sm text-slate-500 mt-2">ஆர்டர்களை Accept பண்ணினால் இங்கே cluster தோன்றும்.</p>
+                </div>
+            ) : (
+                <div className="space-y-6">
+                    {/* Ready to Dispatch Clusters */}
+                    {Object.entries(clusters).map(([pincode, clusterOrders]) => {
+                        const existingHandoff = myRequests.find(r => r.clusterPincode === pincode && r.status !== 'REJECTED');
+                        const claimedByOther = incomingRequests.some(r => r.clusterPincode === pincode);
+                        return (
+                        <div key={pincode} className="rounded-3xl border-2 border-purple-200 bg-white overflow-hidden">
+                            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-5 py-4">
+                                <div className="flex items-center justify-between gap-3 flex-wrap">
+                                    <div className="text-white">
+                                        <p className="text-[10px] uppercase tracking-widest font-black opacity-80">Cluster — Ready to Dispatch</p>
+                                        <p className="text-lg font-black flex items-center gap-2 mt-0.5">
+                                            <MapPin size={16} /> Pincode: {pincode}
+                                        </p>
+                                        <p className="text-xs opacity-80 mt-0.5">{clusterOrders.length} order{clusterOrders.length > 1 ? 's' : ''} • ஒரே பயணம்</p>
+                                    </div>
+                                    <div className="flex gap-2 flex-wrap">
+                                        {/* Dispatch yourself */}
+                                        {!existingHandoff && (
+                                            <button
+                                                onClick={() => deliverCluster(pincode, clusterOrders)}
+                                                disabled={delivering === pincode}
+                                                className="bg-white text-purple-700 font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl hover:bg-purple-50 transition-all disabled:opacity-60 flex items-center gap-2 shadow-lg"
+                                            >
+                                                <Truck size={14} />
+                                                {delivering === pincode ? 'Dispatching...' : 'Dispatch Myself'}
+                                            </button>
+                                        )}
+                                        {/* Request handoff to another farmer */}
+                                        {!existingHandoff && !claimedByOther ? (
+                                            <button
+                                                onClick={() => requestHandoff(pincode)}
+                                                disabled={handoffLoading === 'req_' + pincode}
+                                                className="bg-orange-400 text-white font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl hover:bg-orange-500 transition-all disabled:opacity-60 flex items-center gap-2 shadow-lg"
+                                            >
+                                                <Route size={14} />
+                                                {handoffLoading === 'req_' + pincode ? 'Requesting...' : 'Request Handoff'}
+                                            </button>
+                                        ) : existingHandoff ? (
+                                            <span className={`text-xs font-black px-3 py-2 rounded-xl ${
+                                                existingHandoff.status === 'LOCKED'
+                                                    ? 'bg-emerald-400 text-white'
+                                                    : 'bg-yellow-300 text-yellow-900'
+                                            }`}>
+                                                {existingHandoff.status === 'LOCKED' ? '🔒 Handoff Locked' : '⏳ Awaiting Accept'}
+                                            </span>
+                                        ) : null}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="divide-y divide-slate-100">
+                                {clusterOrders.map((order, idx) => (
+                                    <div key={order.id} className="px-5 py-4 flex items-start justify-between gap-4">
+                                        <div className="space-y-1">
+                                            <p className="text-xs font-black text-purple-600 uppercase tracking-wider">Stop {idx + 1}</p>
+                                            <p className="font-bold text-slate-900">{order.consumer?.name || 'வாங்குபவர்'}</p>
+                                            <p className="text-xs text-slate-500">{order.deliveryAddress}</p>
+                                            <p className="text-xs text-slate-400">#{order.id.slice(0, 8)} • {order.items?.length || 0} items</p>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                            <p className="font-black text-slate-900">₹{order.totalAmount + order.deliveryCharge}</p>
+                                            <p className="text-xs text-slate-400">COD</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        );
+                    })}
+
+                    {/* Out for Delivery Clusters */}
+                    {Object.entries(outClusters).map(([pincode, clusterOrders]) => (
+                        <div key={pincode + '_out'} className="rounded-3xl border-2 border-emerald-200 bg-white overflow-hidden">
+                            <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-4 flex items-center justify-between">
+                                <div className="text-white">
+                                    <p className="text-[10px] uppercase tracking-widest font-black opacity-80">Cluster — Out for Delivery</p>
+                                    <p className="text-lg font-black flex items-center gap-2 mt-0.5">
+                                        <MapPin size={16} /> Pincode: {pincode}
+                                    </p>
+                                    <p className="text-xs opacity-80 mt-0.5">{clusterOrders.length} order{clusterOrders.length > 1 ? 's' : ''} • வழியில் உள்ளது</p>
+                                </div>
+                                <button
+                                    onClick={() => completeCluster(pincode, clusterOrders)}
+                                    disabled={delivering === pincode + '_done'}
+                                    className="bg-white text-emerald-700 font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl hover:bg-emerald-50 transition-all disabled:opacity-60 flex items-center gap-2 shadow-lg"
+                                >
+                                    <CheckCircle size={14} />
+                                    {delivering === pincode + '_done' ? 'Completing...' : 'Mark All Delivered'}
+                                </button>
+                            </div>
+                            <div className="divide-y divide-slate-100">
+                                {clusterOrders.map((order, idx) => (
+                                    <div key={order.id} className="px-5 py-4 flex items-start justify-between gap-4">
+                                        <div className="space-y-1">
+                                            <p className="text-xs font-black text-emerald-600 uppercase tracking-wider">Stop {idx + 1}</p>
+                                            <p className="font-bold text-slate-900">{order.consumer?.name || 'வாங்குபவர்'}</p>
+                                            <p className="text-xs text-slate-500">{order.deliveryAddress}</p>
+                                            <p className="text-xs text-slate-400">#{order.id.slice(0, 8)}</p>
+                                        </div>
+                                        <div className="text-right shrink-0">
+                                            <p className="font-black text-slate-900">₹{order.totalAmount + order.deliveryCharge}</p>
+                                            <p className="text-xs text-emerald-500 font-bold">On the way</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </section>
+    );
+}
+
+function HandoffStepBadge({ step, role }: { step: number; role: 'A' | 'B' }) {
+    const labels: Record<'A' | 'B', string[]> = {
+        A: ['⏳ Awaiting Accept', '🔒 Locked — Send Goods', '📦 Goods Sent — In Transit', '✅ Order Delivered'],
+        B: ['📩 New Request', '🔒 Accepted — Awaiting Goods', '📦 Goods Received — Dispatch Now', '✅ Order Delivered'],
+    };
+    const colors = [
+        'bg-orange-100 text-orange-700',
+        'bg-blue-100 text-blue-700',
+        'bg-purple-100 text-purple-700',
+        'bg-emerald-100 text-emerald-700',
+    ];
+    return (
+        <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full shrink-0 ${colors[step - 1]}`}>
+            {labels[role][step - 1]}
+        </span>
+    );
 }

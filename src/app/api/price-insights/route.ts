@@ -11,8 +11,11 @@ export async function POST(req: Request) {
 
         const today = new Date();
         const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
         const currentMonth = today.getMonth();
         const currentYear = today.getFullYear();
+        const currentDay = dayNames[today.getDay()];
+        const currentDate = today.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' });
 
         // Build last 6 months labels
         const months = [];
@@ -59,7 +62,6 @@ Return exactly this JSON structure (all prices in ₹ per kg, Indian market):
     { "market": "Trichy", "price": <number> },
     { "market": "Salem", "price": <number> }
   ],
-  "bestTimeToSell": "<day of week or time period>",
   "bestMarket": "<market name>"
 }`;
 
@@ -90,6 +92,21 @@ Return exactly this JSON structure (all prices in ₹ per kg, Indian market):
         }
 
         const priceData = JSON.parse(jsonMatch[0]);
+
+        // Compute bestTimeToSell from weeklyPrices — pick the day with highest wholesale price
+        const dayFullNames: Record<string, string> = {
+            Mon: 'Monday', Tue: 'Tuesday', Wed: 'Wednesday',
+            Thu: 'Thursday', Fri: 'Friday', Sat: 'Saturday', Sun: 'Sunday'
+        };
+        const dayTimings: Record<string, string> = {
+            Mon: '7:00 AM', Tue: '6:00 AM', Wed: '7:00 AM',
+            Thu: '6:00 AM', Fri: '7:00 AM', Sat: '6:00 AM', Sun: '8:00 AM'
+        };
+        if (priceData.weeklyPrices?.length) {
+            const best = priceData.weeklyPrices.reduce((a: any, b: any) => b.wholesale > a.wholesale ? b : a);
+            priceData.bestTimeToSell = `${dayFullNames[best.day] ?? best.day} ${dayTimings[best.day] ?? '7:00 AM'} (₹${best.wholesale}/kg)`;
+        }
+
         return NextResponse.json({ success: true, data: priceData, cropName });
 
     } catch (error) {

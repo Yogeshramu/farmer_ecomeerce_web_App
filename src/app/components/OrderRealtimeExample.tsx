@@ -220,7 +220,7 @@ export function OrderStatusTracker({ orderId }: { orderId: string }) {
  *     <div>
  *       <OrderNotificationsWidget />
  *       
- *       // Show status for specific order
+ *       {/* Show status for specific order *\/}
  *       <OrderStatusTracker orderId="order-id-123" />
  *     </div>
  *   );

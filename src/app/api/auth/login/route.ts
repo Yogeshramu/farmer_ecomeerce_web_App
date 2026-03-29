@@ -34,7 +34,7 @@ export async function POST(request: Request) {
         }
 
         // Login
-        await login({ id: user.id, role: user.role, name: user.name });
+        await login({ id: user.id, role: user.role, name: user.name, pincode: user.pincode });
 
         return NextResponse.json({
             success: true,

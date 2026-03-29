@@ -37,6 +37,7 @@ model User {
   crops     Crop[]
   farmerOrders    Order[] @relation("FarmerOrders")
   consumerOrders  Order[] @relation("ConsumerOrders")
+  handlerOrders   Order[] @relation("HandlerOrders")
   
   farmerInquiries   ContactInquiry[] @relation("FarmerInquiries")
   consumerInquiries ContactInquiry[] @relation("ConsumerInquiries")
@@ -44,6 +45,9 @@ model User {
   answers         Answer[]
   
   consumerReviews Review[] @relation("ConsumerReviews")
+  
+  handoffRequests   DeliveryHandoff[] @relation("HandoffRequests")
+  handoffAccepts    DeliveryHandoff[] @relation("HandoffAccepts")
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -93,12 +97,40 @@ model Order {
   deliveryPincode String?
   contactNumber   String?
   
-  items           OrderItem[]
+  // Delivery handoff: locked handler after farmer-to-farmer transfer
+  deliveryHandlerId String?
+  deliveryHandler   User?   @relation("HandlerOrders", fields: [deliveryHandlerId], references: [id])
   
+  items           OrderItem[]
   review          Review?
   
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+}
+
+enum HandoffStatus {
+  PENDING
+  ACCEPTED
+  LOCKED
+  REJECTED
+}
+
+model DeliveryHandoff {
+  id                String        @id @default(uuid())
+  clusterPincode    String
+  
+  requestingFarmerId String
+  requestingFarmer   User         @relation("HandoffRequests", fields: [requestingFarmerId], references: [id])
+  
+  acceptingFarmerId  String?
+  acceptingFarmer    User?        @relation("HandoffAccepts", fields: [acceptingFarmerId], references: [id])
+  
+  status            HandoffStatus @default(PENDING)
+  goodsSentByA      Boolean       @default(false) // Farmer A confirms goods sent to Farmer B
+  goodsSentByB      Boolean       @default(false) // Farmer B confirms goods dispatched to consumer
+  
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 }
 
 model OrderItem {

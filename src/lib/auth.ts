@@ -86,7 +86,7 @@ export async function refreshAccessToken() {
     if (!user) return null;
 
     // Generate new access token
-    const newAccessToken = await signToken({ id: user.id, role: user.role, name: user.name }, '15m');
+    const newAccessToken = await signToken({ id: user.id, role: user.role, name: user.name, pincode: user.pincode }, '15m');
 
     cookieStore.set('accessToken', newAccessToken, {
         httpOnly: true,
@@ -95,7 +95,7 @@ export async function refreshAccessToken() {
         path: '/'
     });
 
-    return { id: user.id, role: user.role, name: user.name };
+    return { id: user.id, role: user.role, name: user.name, pincode: user.pincode };
 }
 
 export async function logout() {
