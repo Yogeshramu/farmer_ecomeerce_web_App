@@ -112,25 +112,22 @@ export default function FarmerDashboard() {
 
     const fetchData = useCallback(async () => {
         try {
-            const [ordersRes, cropsRes, inquiriesRes, reviewsRes, authRes] = await Promise.all([
+            const [ordersRes, cropsRes, inquiriesRes, reviewsRes] = await Promise.all([
                 fetchWithAuth('/api/orders'),
                 fetchWithAuth('/api/crops'),
                 fetchWithAuth('/api/inquiries'),
                 fetchWithAuth('/api/reviews'),
-                fetchWithAuth('/api/auth/check')
             ]);
 
             const ordersData = await ordersRes.json();
             const cropsData = await cropsRes.json();
             const inquiriesData = await inquiriesRes.json();
             const reviewsData = await reviewsRes.json();
-            const authData = await authRes.json();
 
             if (ordersData.orders) setOrders(ordersData.orders);
             if (cropsData.crops) setAllCrops(cropsData.crops);
             if (inquiriesData.inquiries) setInquiries(inquiriesData.inquiries);
             if (reviewsData.reviews) setReviews(reviewsData.reviews);
-            if (authData.user) setUser(authData.user);
         } catch (error: unknown) {
             showToast('Failed to connect to server', 'error');
         }
@@ -138,6 +135,11 @@ export default function FarmerDashboard() {
 
     useEffect(() => {
         const init = async () => {
+            // Fetch user info first so header renders immediately
+            const authRes = await fetchWithAuth('/api/auth/check');
+            const authData = await authRes.json();
+            if (authData.user) setUser(authData.user);
+            // Then load the rest in background
             await fetchData();
         };
         init();
