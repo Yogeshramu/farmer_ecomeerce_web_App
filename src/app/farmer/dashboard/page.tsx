@@ -647,7 +647,7 @@ export default function FarmerDashboard() {
                         )}
 
                         {activeTab === 'cluster' && (
-                            <ClusterDeliveryTab orders={orders} updateStatus={updateStatus} fetchData={fetchData} currentFarmerId={user?.id || ''} />
+                            <ClusterDeliveryTab orders={orders} updateStatus={updateStatus} fetchData={fetchData} currentFarmerId={user?.id || ''} isActive={activeTab === 'cluster'} />
                         )}
 
                         {activeTab === 'add' && (
@@ -1006,11 +1006,12 @@ interface Handoff {
     acceptingFarmer?: { id: string; name: string; pincode?: string };
 }
 
-function ClusterDeliveryTab({ orders, updateStatus, fetchData, currentFarmerId }: {
+function ClusterDeliveryTab({ orders, updateStatus, fetchData, currentFarmerId, isActive }: {
     orders: Order[];
     updateStatus: (id: string, status: string) => Promise<void>;
     fetchData: () => void;
     currentFarmerId: string;
+    isActive: boolean;
 }) {
     const [delivering, setDelivering] = useState<string | null>(null);
     const [myRequests, setMyRequests] = useState<Handoff[]>([]);
@@ -1024,7 +1025,17 @@ function ClusterDeliveryTab({ orders, updateStatus, fetchData, currentFarmerId }
         if (data.incomingRequests) setIncomingRequests(data.incomingRequests);
     }, []);
 
-    useEffect(() => { fetchHandoffs(); }, [fetchHandoffs]);
+    // Initial fetch + poll every 5s only while cluster tab is active
+    useEffect(() => {
+        if (!isActive) return;
+        fetchHandoffs();
+        fetchData(); // sync orders too on tab open
+        const interval = setInterval(async () => {
+            await fetchHandoffs();
+            await fetchData(); // keep orders in sync
+        }, 5000);
+        return () => clearInterval(interval);
+    }, [isActive, fetchHandoffs, fetchData]);
 
     // Group ACCEPTED orders by deliveryPincode (exclude DELIVERED)
     const acceptedOrders = orders.filter(o => o.status === 'ACCEPTED' && o.deliveryPincode);
