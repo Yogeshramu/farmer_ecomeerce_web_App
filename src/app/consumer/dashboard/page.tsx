@@ -53,34 +53,61 @@ interface Order {
     };
 }
 
+const cropArtwork = {
+    tomato: { emoji: '🍅', from: '#ef4444', to: '#fb7185' },
+    potato: { emoji: '🥔', from: '#a16207', to: '#d97706' },
+    onion: { emoji: '🧅', from: '#8b5cf6', to: '#c084fc' },
+    carrot: { emoji: '🥕', from: '#f97316', to: '#fb923c' },
+    cabbage: { emoji: '🥬', from: '#10b981', to: '#34d399' },
+    cauliflower: { emoji: '🥦', from: '#6366f1', to: '#818cf8' },
+    brinjal: { emoji: '🍆', from: '#7c3aed', to: '#a78bfa' },
+    eggplant: { emoji: '🍆', from: '#7c3aed', to: '#a78bfa' },
+    'ladies finger': { emoji: '🌿', from: '#16a34a', to: '#4ade80' },
+    okra: { emoji: '🌿', from: '#16a34a', to: '#4ade80' },
+    chilli: { emoji: '🌶️', from: '#dc2626', to: '#f97316' },
+    pepper: { emoji: '🫑', from: '#0f766e', to: '#14b8a6' },
+    garlic: { emoji: '🧄', from: '#eab308', to: '#fde047' },
+    ginger: { emoji: '🫚', from: '#b45309', to: '#f59e0b' },
+    pumpkin: { emoji: '🎃', from: '#f97316', to: '#facc15' },
+    spinach: { emoji: '🥬', from: '#15803d', to: '#22c55e' },
+    paddy: { emoji: '🌾', from: '#0f766e', to: '#22c55e' },
+    rice: { emoji: '🌾', from: '#0f766e', to: '#22c55e' },
+    apple: { emoji: '🍎', from: '#dc2626', to: '#f87171' },
+    banana: { emoji: '🍌', from: '#facc15', to: '#fde047' },
+    mango: { emoji: '🥭', from: '#f59e0b', to: '#fb923c' },
+    watermelon: { emoji: '🍉', from: '#10b981', to: '#ef4444' },
+    'sweet corn': { emoji: '🌽', from: '#eab308', to: '#f59e0b' },
+    default: { emoji: '🥦', from: '#0ea5e9', to: '#22c55e' },
+} as const;
+
+const normalizeCropName = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ');
+
 const getCropImage = (name: string) => {
-    const images: Record<string, string> = {
-        'tomato': 'https://images.unsplash.com/photo-1592924357228-91a4daadcfea?w=400&q=80',
-        'potato': 'https://images.unsplash.com/photo-1518977676601-b53f82aba655?w=400&q=80',
-        'onion': 'https://images.unsplash.com/photo-1618512496248-a07fe83aa8cb?w=400&q=80',
-        'carrot': 'https://images.unsplash.com/photo-1598170845058-32b9d6a5da37?w=400&q=80',
-        'cabbage': 'https://images.unsplash.com/photo-1596162954151-cdcb92211425?w=400&q=80',
-        'brinjal': 'https://images.unsplash.com/photo-1604543519968-3e4b4bbfff1e?w=400&q=80',
-        'eggplant': 'https://images.unsplash.com/photo-1604543519968-3e4b4bbfff1e?w=400&q=80',
-        'ladies finger': 'https://images.unsplash.com/photo-1425543103986-22abb7d7e8d2?w=400&q=80',
-        'okra': 'https://images.unsplash.com/photo-1425543103986-22abb7d7e8d2?w=400&q=80',
-        'chilli': 'https://images.unsplash.com/photo-1588015386616-291117da8c1e?w=400&q=80',
-        'garlic': 'https://images.unsplash.com/photo-1540148426940-62ba5bc2178d?w=400&q=80',
-        'ginger': 'https://images.unsplash.com/photo-1615485908064-08eb41e0b57e?w=400&q=80',
-        'pumpkin': 'https://images.unsplash.com/photo-1506917728037-b6fb0132db8e?w=400&q=80',
-        'spinach': 'https://images.unsplash.com/photo-1576045057995-568f588f82fb?w=400&q=80',
-        'apple': 'https://images.unsplash.com/photo-1560806887-1e4cdaa120cb?w=400&q=80',
-        'banana': 'https://images.unsplash.com/photo-1571501679680-bd7629a4e125?w=400&q=80',
-        'mango': 'https://images.unsplash.com/photo-1553279768-865429fd815e?w=400&q=80',
-        'watermelon': 'https://images.unsplash.com/photo-1582281268143-04d41e737c03?w=400&q=80',
-        'default': 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=400&q=80'
-    };
-    
-    const n = name.toLowerCase().trim();
-    for (const key in images) {
-        if (n.includes(key)) return images[key];
-    }
-    return images['default'];
+    const normalizedName = normalizeCropName(name);
+    const artwork = cropArtwork[normalizedName as keyof typeof cropArtwork] || cropArtwork.default;
+    const safeLabel = name.replace(/[<&>]/g, '').slice(0, 28);
+
+    const svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" role="img" aria-label="${safeLabel}">
+            <defs>
+                <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="${artwork.from}"/>
+                    <stop offset="100%" stop-color="${artwork.to}"/>
+                </linearGradient>
+            </defs>
+            <rect width="800" height="600" rx="40" fill="url(#g)"/>
+            <circle cx="640" cy="120" r="150" fill="rgba(255,255,255,0.16)"/>
+            <circle cx="140" cy="500" r="190" fill="rgba(255,255,255,0.12)"/>
+            <circle cx="130" cy="120" r="70" fill="rgba(255,255,255,0.10)"/>
+            <text x="60" y="115" fill="rgba(255,255,255,0.92)" font-size="34" font-weight="700" font-family="Arial, Helvetica, sans-serif">FarmDirect</text>
+            <text x="400" y="360" text-anchor="middle" font-size="180">${artwork.emoji}</text>
+            <rect x="70" y="400" width="660" height="120" rx="28" fill="rgba(255,255,255,0.16)"/>
+            <text x="400" y="452" text-anchor="middle" fill="white" font-size="48" font-weight="800" font-family="Arial, Helvetica, sans-serif">${safeLabel}</text>
+            <text x="400" y="494" text-anchor="middle" fill="rgba(255,255,255,0.9)" font-size="22" font-weight="600" font-family="Arial, Helvetica, sans-serif">Fresh crop image</text>
+        </svg>
+    `;
+
+    return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 };
 
 export default function ConsumerDashboard() {
@@ -158,11 +185,30 @@ export default function ConsumerDashboard() {
     }, []);
 
     useEffect(() => {
-        const init = async () => {
-            await fetchCrops();
-            await fetchOrders();
+        fetchCrops();
+        fetchOrders();
+
+        // Listen for WS REFRESH events so orders update without polling
+        let ws: WebSocket | null = null;
+        const setup = async () => {
+            try {
+                const healthRes = await fetch('http://localhost:8080/health');
+                if (!healthRes.ok) return;
+                const tokenRes = await fetch('/api/auth/socket-token');
+                if (!tokenRes.ok) return;
+                const { token } = await tokenRes.json();
+                ws = new WebSocket(process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8080');
+                ws.onopen = () => ws?.send(JSON.stringify({ type: 'AUTH', token }));
+                ws.onmessage = (event) => {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'REFRESH' && (data.scope === 'orders' || data.scope === 'all')) {
+                        fetchOrders();
+                    }
+                };
+            } catch { /* WS not available, no-op */ }
         };
-        init();
+        setup();
+        return () => { if (ws) ws.close(); };
     }, [fetchCrops, fetchOrders]);
 
     const addToCart = (crop: Crop, qty: number = 1): boolean => {
@@ -405,9 +451,6 @@ export default function ConsumerDashboard() {
                                             src={getCropImage(crop.name)}
                                             alt={crop.name}
                                             className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                            onError={(e) => {
-                                                (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1610832958506-aa56368176cf?w=400&q=80';
-                                            }}
                                         />
                                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent"></div>
                                         <div className="absolute top-3 left-3 bg-white/95 backdrop-blur-sm px-3 py-1 rounded-full text-xs font-bold text-slate-800 shadow-sm flex items-center gap-1.5 z-10">

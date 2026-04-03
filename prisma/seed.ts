@@ -10,6 +10,7 @@ async function main() {
     await prisma.pincodeLocation.createMany({
         data: [
             { pincode: '600001', latitude: 13.0827, longitude: 80.2707 },
+            { pincode: '600002', latitude: 13.0750, longitude: 80.2707 },
             { pincode: '600017', latitude: 13.0405, longitude: 80.2337 },
             { pincode: '600020', latitude: 13.0067, longitude: 80.2570 },
             { pincode: '600048', latitude: 13.0358, longitude: 80.1750 },
@@ -43,17 +44,22 @@ async function main() {
 
     const farmer2 = await prisma.user.upsert({
         where: { email: 'farmer2@test.com' },
-        update: {},
+        update: {
+            pincode: '600002',
+            address: 'No.5, Madurai Main Road',
+            latitude: 13.0750,
+            longitude: 80.2707
+        },
         create: {
             name: 'Suresh Muthu',
             email: 'farmer2@test.com',
             password,
             role: 'FARMER',
             mobile: '9123456788',
-            pincode: '625001',
+            pincode: '600002',
             address: 'No.5, Madurai Main Road',
-            latitude: 9.9252,
-            longitude: 78.1198
+            latitude: 13.0750,
+            longitude: 80.2707
         }
     });
 
@@ -116,10 +122,10 @@ async function main() {
     const paddy  = await prisma.crop.create({ data: { name: 'Paddy',    quantityKg: 200, basePrice: 25, farmerPincode: '600001', farmerId: farmer1.id } });
 
     // ── Crops — Farmer 2 (Madurai) ────────────────────────────────────────────
-    const carrot      = await prisma.crop.create({ data: { name: 'Carrot',      quantityKg: 60,  basePrice: 45, farmerPincode: '625001', farmerId: farmer2.id } });
-    const cabbage     = await prisma.crop.create({ data: { name: 'Cabbage',     quantityKg: 40,  basePrice: 25, farmerPincode: '625001', farmerId: farmer2.id } });
-    const cauliflower = await prisma.crop.create({ data: { name: 'Cauliflower', quantityKg: 30,  basePrice: 50, farmerPincode: '625001', farmerId: farmer2.id } });
-    const brinjal     = await prisma.crop.create({ data: { name: 'Brinjal',     quantityKg: 45,  basePrice: 30, farmerPincode: '625001', farmerId: farmer2.id } });
+    const carrot      = await prisma.crop.create({ data: { name: 'Carrot',      quantityKg: 60,  basePrice: 45, farmerPincode: '600002', farmerId: farmer2.id } });
+    const cabbage     = await prisma.crop.create({ data: { name: 'Cabbage',     quantityKg: 40,  basePrice: 25, farmerPincode: '600002', farmerId: farmer2.id } });
+    const cauliflower = await prisma.crop.create({ data: { name: 'Cauliflower', quantityKg: 30,  basePrice: 50, farmerPincode: '600002', farmerId: farmer2.id } });
+    const brinjal     = await prisma.crop.create({ data: { name: 'Brinjal',     quantityKg: 45,  basePrice: 30, farmerPincode: '600002', farmerId: farmer2.id } });
 
     // ── Crops — Farmer 3 (Coimbatore) ─────────────────────────────────────────
     const mango      = await prisma.crop.create({ data: { name: 'Mango',       quantityKg: 150, basePrice: 60, farmerPincode: '641001', farmerId: farmer3.id } });
@@ -269,7 +275,7 @@ async function main() {
 
     console.log('\n✅ Seed complete!');
     console.log('   Farmer 1  : farmer@test.com  / password123  (Chennai 600001)');
-    console.log('   Farmer 2  : farmer2@test.com / password123  (Madurai 625001)');
+    console.log('   Farmer 2  : farmer2@test.com / password123  (Chennai 600002)');
     console.log('   Farmer 3  : farmer3@test.com / password123  (Coimbatore 641001)');
     console.log('   Consumer 1: consumer@test.com  / password123');
     console.log('   Consumer 2: consumer2@test.com / password123');

@@ -37,9 +37,7 @@ const server = http.createServer(async (req, res) => {
     // Handle broadcast requests from API routes
     if (req.method === 'POST' && req.url === '/broadcast') {
         let body = '';
-        req.on('data', chunk => {
-            body += chunk.toString();
-        });
+        req.on('data', chunk => { body += chunk.toString(); });
         req.on('end', () => {
             try {
                 const data = JSON.parse(body);
@@ -58,14 +56,30 @@ const server = http.createServer(async (req, res) => {
     // Handle alert requests from API routes
     if (req.method === 'POST' && req.url === '/alert') {
         let body = '';
-        req.on('data', chunk => {
-            body += chunk.toString();
-        });
+        req.on('data', chunk => { body += chunk.toString(); });
         req.on('end', () => {
             try {
                 const data = JSON.parse(body);
                 const { userId, alert } = data;
                 sendAlert(userId, alert);
+                res.writeHead(200);
+                res.end(JSON.stringify({ success: true }));
+            } catch (error) {
+                res.writeHead(400);
+                res.end(JSON.stringify({ error: 'Invalid request' }));
+            }
+        });
+        return;
+    }
+
+    // Push a REFRESH signal to a specific user (no polling needed)
+    if (req.method === 'POST' && req.url === '/refresh') {
+        let body = '';
+        req.on('data', chunk => { body += chunk.toString(); });
+        req.on('end', () => {
+            try {
+                const { userId, scope } = JSON.parse(body); // scope: 'orders' | 'handoffs' | 'all'
+                sendRefresh(userId, scope || 'all');
                 res.writeHead(200);
                 res.end(JSON.stringify({ success: true }));
             } catch (error) {
@@ -96,6 +110,15 @@ const wss = new WebSocketServer({ server });
 
 console.log("WebSocket Server running on ws://localhost:8080");
 console.log("HTTP Broadcast API available on http://localhost:8080");
+
+// Function to send a refresh signal to a specific user
+function sendRefresh(userId, scope) {
+    const connections = userConnections.get(userId) || new Set();
+    const message = JSON.stringify({ type: 'REFRESH', scope, timestamp: new Date().toISOString() });
+    for (const ws of connections) {
+        if (ws.readyState === 1) ws.send(message);
+    }
+}
 
 // Function to broadcast order updates to relevant users
 function broadcastOrderUpdate(orderId, update) {

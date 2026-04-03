@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
 import { calculateDeliveryCharge } from '@/lib/deliveryCalculator';
-import { broadcastOrderUpdate, notifyFarmerOfNewOrder } from '@/lib/websocket-broadcast';
+import { broadcastOrderUpdate, notifyFarmerOfNewOrder, sendRefreshToUser } from '@/lib/websocket-broadcast';
 
 interface GroupedItem {
     cropId: string;
@@ -33,14 +33,19 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Cart is empty' }, { status: 400 });
         }
 
+        // 1. Batch fetch all crops at once
+        const cropIds = items.map((i: { cropId: string }) => i.cropId);
+        const allCrops = await prisma.crop.findMany({
+            where: { id: { in: cropIds } },
+            include: { farmer: true }
+        });
+        const cropMap = new Map(allCrops.map(c => [c.id, c]));
+
         // 1. Group items by farmer
         const itemsByFarmer: Record<string, GroupedItem[]> = {};
 
         for (const item of items) {
-            const crop = await prisma.crop.findUnique({
-                where: { id: item.cropId },
-                include: { farmer: true }
-            });
+            const crop = cropMap.get(item.cropId);
             if (!crop) continue;
 
             const orderQty = parseFloat(item.quantity.toString());
@@ -99,40 +104,22 @@ export async function POST(request: Request) {
                 include: { items: true }
             });
 
-            // Decrement crop quantities and auto-delete if out of stock
-            for (const i of farmerItems) {
+            // Decrement crop quantities in parallel
+            await Promise.all(farmerItems.map(i => {
                 const qtyToDeduct = i.decodedQty || parseFloat(i.quantity.toString());
-                const updatedCrop = await prisma.crop.update({
+                return prisma.crop.update({
                     where: { id: i.cropId },
-                    data: {
-                        quantityKg: {
-                            decrement: qtyToDeduct
-                        }
-                    }
+                    data: { quantityKg: { decrement: qtyToDeduct } }
                 });
-
-                // No auto-delete here. Keeping records for history. 
-                // Front-end filters by quantityKg > 0.
-            }
+            }));
 
             createdOrders.push(order);
 
-            // Get consumer name for notification
-            const consumer = await prisma.user.findUnique({
-                where: { id: session.id as string }
+            // Fire-and-forget: notify farmer via WS (push REFRESH so dashboard re-fetches)
+            prisma.user.findUnique({ where: { id: session.id as string } }).then(consumer => {
+                if (consumer) notifyFarmerOfNewOrder(farmerId, order.id, consumer.name);
             });
-
-            // Notify farmer of new order via WebSocket
-            if (consumer) {
-                await notifyFarmerOfNewOrder(farmerId, order.id, consumer.name);
-            }
-
-            // Broadcast the new order update
-            await broadcastOrderUpdate(order.id, {
-                status: order.status,
-                updatedAt: order.createdAt,
-                message: 'New order placed'
-            });
+            sendRefreshToUser(farmerId, 'orders');
 
         }
 

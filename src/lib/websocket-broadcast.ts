@@ -21,45 +21,50 @@ export interface Alert {
  */
 export async function broadcastOrderUpdate(orderId: string, update: OrderUpdate) {
     try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 500);
         const response = await fetch('http://localhost:8080/broadcast', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                type: 'ORDER_UPDATE',
-                orderId,
-                update
-            })
+            body: JSON.stringify({ type: 'ORDER_UPDATE', orderId, update }),
+            signal: controller.signal
         });
-
-        if (!response.ok) {
-            console.warn(`Failed to broadcast order update: ${response.statusText}`);
-        }
+        clearTimeout(timeout);
+        if (!response.ok) console.warn(`Failed to broadcast order update: ${response.statusText}`);
     } catch {
         // WebSocket server not running - this is okay in development.
-        console.log('WebSocket server not reachable, skipping broadcast');
     }
 }
 
-/**
- * Send an alert to a specific user.
- */
 export async function sendAlertToUser(userId: string, alert: Alert) {
     try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 500);
         const response = await fetch('http://localhost:8080/alert', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                userId,
-                alert
-            })
+            body: JSON.stringify({ userId, alert }),
+            signal: controller.signal
         });
-
-        if (!response.ok) {
-            console.warn(`Failed to send alert: ${response.statusText}`);
-        }
+        clearTimeout(timeout);
+        if (!response.ok) console.warn(`Failed to send alert: ${response.statusText}`);
     } catch {
-        console.log('WebSocket server not reachable for alerts');
+        // silent
     }
+}
+
+export async function sendRefreshToUser(userId: string, scope: 'orders' | 'handoffs' | 'all' = 'all') {
+    try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 500);
+        await fetch('http://localhost:8080/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, scope }),
+            signal: controller.signal
+        });
+        clearTimeout(timeout);
+    } catch { /* silent */ }
 }
 
 /**

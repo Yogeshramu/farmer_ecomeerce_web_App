@@ -57,7 +57,7 @@ model Crop {
   id            String   @id @default(uuid())
   name          String
   quantityKg    Float
-  basePrice     Float    // Price per Kg
+  basePrice     Float
   farmerPincode String?
   
   farmerId      String
@@ -65,11 +65,13 @@ model Crop {
   
   items         OrderItem[]
   inquiries     ContactInquiry[]
-  
   reviews       Review[]
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@index([farmerId])
+  @@index([quantityKg])
 }
 
 model PincodeLocation {
@@ -106,6 +108,10 @@ model Order {
   
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+
+  @@index([farmerId])
+  @@index([consumerId])
+  @@index([farmerId, status])
 }
 
 enum HandoffStatus {
@@ -126,11 +132,15 @@ model DeliveryHandoff {
   acceptingFarmer    User?        @relation("HandoffAccepts", fields: [acceptingFarmerId], references: [id])
   
   status            HandoffStatus @default(PENDING)
-  goodsSentByA      Boolean       @default(false) // Farmer A confirms goods sent to Farmer B
-  goodsSentByB      Boolean       @default(false) // Farmer B confirms goods dispatched to consumer
+  goodsSentByA      Boolean       @default(false)
+  goodsSentByB      Boolean       @default(false)
   
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
+
+  @@index([requestingFarmerId])
+  @@index([acceptingFarmerId])
+  @@index([status])
 }
 
 model OrderItem {
@@ -183,15 +193,18 @@ model ContactInquiry {
   contactNumber   String?
   
   message     String
-  status      String   @default("PENDING") // PENDING, RESPONDED, CLOSED
+  status      String   @default("PENDING")
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([farmerId])
+  @@index([consumerId])
 }
 
 model Review {
   id          String   @id @default(uuid())
-  rating      Int      // 1-5
+  rating      Int
   comment     String?
   
   cropId      String
@@ -200,10 +213,13 @@ model Review {
   consumerId  String
   consumer    User     @relation("ConsumerReviews", fields: [consumerId], references: [id])
   
-  orderId     String?  @unique // Link to the specific order
+  orderId     String?  @unique
   order       Order?   @relation(fields: [orderId], references: [id])
   
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([cropId])
+  @@index([consumerId])
 }
 

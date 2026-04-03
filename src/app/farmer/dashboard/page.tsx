@@ -109,10 +109,11 @@ export default function FarmerDashboard() {
     // WebSocket State
     const [socket, setSocket] = useState<WebSocket | null>(null);
     const [wsConnected, setWsConnected] = useState(false);
+    const [needsHandoffRefresh, setNeedsHandoffRefresh] = useState(false);
 
     const fetchOrders = useCallback(async () => {
         try {
-            const res = await fetchWithAuth('/api/orders');
+            const res = await fetchWithAuth('/api/dashboard');
             const data = await res.json();
             if (data.orders) setOrders(data.orders);
         } catch {}
@@ -120,22 +121,12 @@ export default function FarmerDashboard() {
 
     const fetchData = useCallback(async () => {
         try {
-            const [ordersRes, cropsRes, inquiriesRes, reviewsRes] = await Promise.all([
-                fetchWithAuth('/api/orders'),
-                fetchWithAuth('/api/crops'),
-                fetchWithAuth('/api/inquiries'),
-                fetchWithAuth('/api/reviews'),
-            ]);
-
-            const ordersData = await ordersRes.json();
-            const cropsData = await cropsRes.json();
-            const inquiriesData = await inquiriesRes.json();
-            const reviewsData = await reviewsRes.json();
-
-            if (ordersData.orders) setOrders(ordersData.orders);
-            if (cropsData.crops) setAllCrops(cropsData.crops);
-            if (inquiriesData.inquiries) setInquiries(inquiriesData.inquiries);
-            if (reviewsData.reviews) setReviews(reviewsData.reviews);
+            const res = await fetchWithAuth('/api/dashboard');
+            const data = await res.json();
+            if (data.orders) setOrders(data.orders);
+            if (data.crops) setAllCrops(data.crops);
+            if (data.inquiries) setInquiries(data.inquiries);
+            if (data.reviews) setReviews(data.reviews);
         } catch (error: unknown) {
             showToast('Failed to connect to server', 'error');
         }
@@ -180,11 +171,15 @@ export default function FarmerDashboard() {
                         setSocket(ws);
                         setWsConnected(true);
                     }
+                    if (data.type === 'REFRESH') {
+                        if (data.scope === 'orders' || data.scope === 'all') fetchOrders();
+                        if (data.scope === 'handoffs' || data.scope === 'all') setNeedsHandoffRefresh(true);
+                    }
                     if (data.type === 'CROP_ADDED') {
                         setIsSubmitting(false);
                         setCropName('');
                         setQuantity('');
-                        setBasePrice('40'); // Reset to default
+                        setBasePrice('40');
                         showToast(`Successfully added ${data.crop.name}`, 'success');
                         fetchData();
                     }
@@ -366,7 +361,7 @@ export default function FarmerDashboard() {
                 return;
             }
 
-            fetchData();
+            fetchOrders(); // only refresh orders, not full fetchData
         } catch (error) {
             showToast('Failed to update order status', 'error');
         }
@@ -657,7 +652,7 @@ export default function FarmerDashboard() {
                         )}
 
                         {activeTab === 'cluster' && (
-                            <ClusterDeliveryTab orders={orders} updateStatus={updateStatus} fetchOrders={fetchOrders} currentFarmerId={user?.id || ''} isActive={activeTab === 'cluster'} />
+                            <ClusterDeliveryTab orders={orders} updateStatus={updateStatus} fetchOrders={fetchOrders} currentFarmerId={user?.id || ''} isActive={activeTab === 'cluster'} needsHandoffRefresh={needsHandoffRefresh} onHandoffRefreshDone={() => setNeedsHandoffRefresh(false)} />
                         )}
 
                         {activeTab === 'add' && (
@@ -1016,36 +1011,42 @@ interface Handoff {
     acceptingFarmer?: { id: string; name: string; pincode?: string };
 }
 
-function ClusterDeliveryTab({ orders, updateStatus, fetchOrders, currentFarmerId, isActive }: {
+function ClusterDeliveryTab({ orders, updateStatus, fetchOrders, currentFarmerId, isActive, needsHandoffRefresh, onHandoffRefreshDone }: {
     orders: Order[];
     updateStatus: (id: string, status: string) => Promise<void>;
     fetchOrders: () => void;
     currentFarmerId: string;
     isActive: boolean;
+    needsHandoffRefresh: boolean;
+    onHandoffRefreshDone: () => void;
 }) {
     const [delivering, setDelivering] = useState<string | null>(null);
     const [myRequests, setMyRequests] = useState<Handoff[]>([]);
     const [incomingRequests, setIncomingRequests] = useState<Handoff[]>([]);
     const [handoffLoading, setHandoffLoading] = useState<string | null>(null);
+    const [hasNearbyFarmer, setHasNearbyFarmer] = useState(false);
 
     const fetchHandoffs = useCallback(async () => {
         const res = await fetchWithAuth('/api/delivery-handoff');
         const data = await res.json();
         if (data.myRequests) setMyRequests(data.myRequests);
         if (data.incomingRequests) setIncomingRequests(data.incomingRequests);
+        setHasNearbyFarmer(!!data.hasNearbyFarmer);
     }, []);
 
-    // Poll only handoffs + orders every 5s while cluster tab is active
+    // Fetch once when tab becomes active
     useEffect(() => {
         if (!isActive) return;
         fetchHandoffs();
         fetchOrders();
-        const interval = setInterval(() => {
-            fetchHandoffs();
-            fetchOrders();
-        }, 5000);
-        return () => clearInterval(interval);
     }, [isActive, fetchHandoffs, fetchOrders]);
+
+    // Re-fetch when server pushes a REFRESH event via WebSocket
+    useEffect(() => {
+        if (!needsHandoffRefresh) return;
+        fetchHandoffs();
+        onHandoffRefreshDone();
+    }, [needsHandoffRefresh, fetchHandoffs, onHandoffRefreshDone]);
 
     // Group ACCEPTED orders by deliveryPincode (exclude DELIVERED)
     const acceptedOrders = orders.filter(o => o.status === 'ACCEPTED' && o.deliveryPincode);
@@ -1067,18 +1068,14 @@ function ClusterDeliveryTab({ orders, updateStatus, fetchOrders, currentFarmerId
 
     const deliverCluster = async (pincode: string, clusterOrders: Order[]) => {
         setDelivering(pincode);
-        for (const order of clusterOrders) {
-            await updateStatus(order.id, 'OUT_FOR_DELIVERY');
-        }
+        await Promise.all(clusterOrders.map(order => updateStatus(order.id, 'OUT_FOR_DELIVERY')));
         setDelivering(null);
         fetchOrders();
     };
 
     const completeCluster = async (pincode: string, clusterOrders: Order[]) => {
         setDelivering(pincode + '_done');
-        for (const order of clusterOrders) {
-            await updateStatus(order.id, 'DELIVERED');
-        }
+        await Promise.all(clusterOrders.map(order => updateStatus(order.id, 'DELIVERED')));
         setDelivering(null);
         fetchOrders();
     };
@@ -1111,7 +1108,7 @@ function ClusterDeliveryTab({ orders, updateStatus, fetchOrders, currentFarmerId
     return (
         <section className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div>
-                <p className="text-[10px] uppercase tracking-[0.2em] font-black text-purple-600">Dijkstra Cluster Routing</p>
+                <p className="text-[10px] uppercase tracking-[0.2em] font-black text-purple-600">டைக்ஸ்ட்ரா கிளஸ்டர் வழிமுறை</p>
                 <h2 className="text-2xl font-black text-slate-900 tracking-tight">கிளஸ்டர் டெலிவரி</h2>
                 <p className="text-sm text-slate-500 mt-1">ஒரே பகுதியில் உள்ள ஆர்டர்கள் தானாக குழுவாக்கப்படுகின்றன — ஒரே பயணத்தில் அனைத்தையும் வழங்கவும்.</p>
             </div>
@@ -1120,8 +1117,8 @@ function ClusterDeliveryTab({ orders, updateStatus, fetchOrders, currentFarmerId
             <div className="rounded-2xl border border-purple-200 bg-purple-50 p-4 flex gap-3 items-start">
                 <Route size={20} className="text-purple-600 shrink-0 mt-0.5" />
                 <div className="text-sm text-purple-800">
-                    <p className="font-black">Cluster Logic (Dijkstra-based) + Farmer Handoff</p>
-                    <p className="mt-0.5 font-medium">Same pincode orders → ஒரே cluster. நீங்கள் deliver பண்ண முடியாவிட்டால் மற்றொரு farmer-க்கு handoff request அனுப்பலாம். Accept ஆனதும் lock ஆகும் — மேலும் reassign இல்லை.</p>
+                    <p className="font-black">கிளஸ்டர் லாஜிக் (Dijkstra அடிப்படை) + விவசாயி ஹேண்ட்ஆஃப்</p>
+                    <p className="mt-0.5 font-medium">Same pincode orders → ஒரே cluster. நீங்கள் deliver பண்ண முடியாவிட்டால் மற்றொரு farmer-க்கு handoff request அனுப்பலாம். <span className="font-black text-purple-900">10km உள்ளே உள்ள farmers மட்டுமே</span> உங்கள் request பார்க்க மற்றும் accept பண்ண முடியும். Accept ஆனதும் lock ஆகும் — மேலும் reassign இல்லை.</p>
                 </div>
             </div>
 
@@ -1136,7 +1133,12 @@ function ClusterDeliveryTab({ orders, updateStatus, fetchOrders, currentFarmerId
                                 <div className="flex items-start justify-between gap-4 flex-wrap">
                                     <div>
                                         <p className="font-black text-slate-900">{req.requestingFarmer?.name} கோரிக்கை அனுப்பினார்</p>
-                                        <p className="text-xs text-slate-500 mt-0.5">Cluster Pincode: <span className="font-bold">{req.clusterPincode}</span></p>
+                                        <p className="text-xs text-slate-500 mt-0.5">
+                                            Cluster Pincode: <span className="font-bold">{req.clusterPincode}</span>
+                                            {req.requestingFarmer?.pincode && (
+                                                <span className="ml-2 text-emerald-600 font-bold">📍 {req.requestingFarmer.pincode}</span>
+                                            )}
+                                        </p>
                                     </div>
                                     <HandoffStepBadge step={step} role="B" />
                                 </div>
@@ -1150,14 +1152,14 @@ function ClusterDeliveryTab({ orders, updateStatus, fetchOrders, currentFarmerId
                                             className="flex-1 bg-emerald-600 text-white font-black text-xs uppercase px-3 py-2.5 rounded-xl hover:bg-emerald-700 disabled:opacity-60 flex items-center justify-center gap-1"
                                         >
                                             <CheckCircle size={13} />
-                                            {handoffLoading === req.id ? '...' : 'Accept'}
+                                            {handoffLoading === req.id ? '...' : 'ஏற்கவும்'}
                                         </button>
                                         <button
                                             onClick={() => respondHandoff(req.id, 'REJECT')}
                                             disabled={handoffLoading === req.id}
                                             className="flex-1 bg-white border border-red-200 text-red-600 font-black text-xs uppercase px-3 py-2.5 rounded-xl hover:bg-red-50 disabled:opacity-60"
                                         >
-                                            Reject
+                                            நிராகரி
                                         </button>
                                     </div>
                                 )}
@@ -1177,14 +1179,14 @@ function ClusterDeliveryTab({ orders, updateStatus, fetchOrders, currentFarmerId
                                         className="w-full bg-purple-600 text-white font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl hover:bg-purple-700 disabled:opacity-60 flex items-center justify-center gap-2"
                                     >
                                         <Truck size={14} />
-                                        {handoffLoading === req.id ? 'Dispatching...' : '🚚 Goods Received & Dispatched to Consumer'}
+                                        {handoffLoading === req.id ? 'அனுப்பப்படுகிறது...' : '🚚 பொருள் பெற்றேன் & வாடிக்கையாளருக்கு அனுப்பிவிட்டேன்'}
                                     </button>
                                 )}
 
                                 {/* Step 4: Done */}
                                 {step === 4 && (
                                     <p className="text-xs font-bold text-emerald-700 bg-emerald-50 rounded-xl px-3 py-2">
-                                        ✅ ஆர்டர் வழங்கப்பட்டது — Order Delivered
+                                        ✅ ஆர்டர் வழங்கப்பட்டது
                                     </p>
                                 )}
                             </div>
@@ -1204,8 +1206,8 @@ function ClusterDeliveryTab({ orders, updateStatus, fetchOrders, currentFarmerId
                             <div key={req.id} className="rounded-xl border border-slate-200 bg-white px-4 py-4 space-y-3">
                                 <div className="flex items-center justify-between gap-3 flex-wrap">
                                     <div>
-                                        <p className="text-sm font-bold text-slate-800">Cluster Pincode: {req.clusterPincode}</p>
-                                        {req.acceptingFarmer && <p className="text-xs text-slate-500">Accepted by: <span className="font-bold">{req.acceptingFarmer.name}</span></p>}
+                                        <p className="text-sm font-bold text-slate-800">கிளஸ்டர் பின்கோடு: {req.clusterPincode}</p>
+                                        {req.acceptingFarmer && <p className="text-xs text-slate-500">ஏற்றவர்: <span className="font-bold">{req.acceptingFarmer.name}</span></p>}
                                     </div>
                                     <HandoffStepBadge step={step} role="A" />
                                 </div>
@@ -1217,7 +1219,7 @@ function ClusterDeliveryTab({ orders, updateStatus, fetchOrders, currentFarmerId
                                         className="w-full bg-blue-600 text-white font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl hover:bg-blue-700 disabled:opacity-60 flex items-center justify-center gap-2"
                                     >
                                         <Package size={14} />
-                                        {handoffLoading === req.id ? 'Confirming...' : '📦 Goods Sent to Farmer B'}
+                                        {handoffLoading === req.id ? 'உறுதிப்படுத்துகிறது...' : '📦 பொருள் Farmer B-க்கு அனுப்பிவிட்டேன்'}
                                     </button>
                                 )}
                             </div>
@@ -1243,11 +1245,11 @@ function ClusterDeliveryTab({ orders, updateStatus, fetchOrders, currentFarmerId
                             <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-5 py-4">
                                 <div className="flex items-center justify-between gap-3 flex-wrap">
                                     <div className="text-white">
-                                        <p className="text-[10px] uppercase tracking-widest font-black opacity-80">Cluster — Ready to Dispatch</p>
+                                        <p className="text-[10px] uppercase tracking-widest font-black opacity-80">கிளஸ்டர் — அனுப்ப தயாராக</p>
                                         <p className="text-lg font-black flex items-center gap-2 mt-0.5">
-                                            <MapPin size={16} /> Pincode: {pincode}
+                                            <MapPin size={16} /> பின்கோடு: {pincode}
                                         </p>
-                                        <p className="text-xs opacity-80 mt-0.5">{clusterOrders.length} order{clusterOrders.length > 1 ? 's' : ''} • ஒரே பயணம்</p>
+                                        <p className="text-xs opacity-80 mt-0.5">{clusterOrders.length} ஆர்டர் • ஒரே பயணம்</p>
                                     </div>
                                     <div className="flex gap-2 flex-wrap">
                                         {/* Dispatch yourself */}
@@ -1258,26 +1260,30 @@ function ClusterDeliveryTab({ orders, updateStatus, fetchOrders, currentFarmerId
                                                 className="bg-white text-purple-700 font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl hover:bg-purple-50 transition-all disabled:opacity-60 flex items-center gap-2 shadow-lg"
                                             >
                                                 <Truck size={14} />
-                                                {delivering === pincode ? 'Dispatching...' : 'Dispatch Myself'}
+                                                {delivering === pincode ? 'அனுப்பப்படுகிறது...' : 'நானே வழங்குகிறேன்'}
                                             </button>
                                         )}
-                                        {/* Request handoff to another farmer */}
-                                        {!existingHandoff && !claimedByOther ? (
+                                        {/* Request handoff to another farmer — only if a nearby farmer exists */}
+                                        {!existingHandoff && !claimedByOther && hasNearbyFarmer ? (
                                             <button
                                                 onClick={() => requestHandoff(pincode)}
                                                 disabled={handoffLoading === 'req_' + pincode}
                                                 className="bg-orange-400 text-white font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl hover:bg-orange-500 transition-all disabled:opacity-60 flex items-center gap-2 shadow-lg"
                                             >
                                                 <Route size={14} />
-                                                {handoffLoading === 'req_' + pincode ? 'Requesting...' : 'Request Handoff'}
+                                                {handoffLoading === 'req_' + pincode ? 'கோருகிறது...' : 'ஹேண்ட்ஆஃப் கோரிக்கை'}
                                             </button>
+                                        ) : !existingHandoff && !claimedByOther && !hasNearbyFarmer ? (
+                                            <span className="text-xs font-bold px-3 py-2 rounded-xl bg-slate-100 text-slate-400">
+                                                📍 10km உள்ளே விவசாயி இல்லை
+                                            </span>
                                         ) : existingHandoff ? (
                                             <span className={`text-xs font-black px-3 py-2 rounded-xl ${
                                                 existingHandoff.status === 'LOCKED'
                                                     ? 'bg-emerald-400 text-white'
                                                     : 'bg-yellow-300 text-yellow-900'
                                             }`}>
-                                                {existingHandoff.status === 'LOCKED' ? '🔒 Handoff Locked' : '⏳ Awaiting Accept'}
+                                                {existingHandoff.status === 'LOCKED' ? '🔒 ஹேண்ட்ஆஃப் பூட்டப்பட்டது' : '⏳ ஏற்றதை காத்திருக்கிறது'}
                                             </span>
                                         ) : null}
                                     </div>
@@ -1287,10 +1293,10 @@ function ClusterDeliveryTab({ orders, updateStatus, fetchOrders, currentFarmerId
                                 {clusterOrders.map((order, idx) => (
                                     <div key={order.id} className="px-5 py-4 flex items-start justify-between gap-4">
                                         <div className="space-y-1">
-                                            <p className="text-xs font-black text-purple-600 uppercase tracking-wider">Stop {idx + 1}</p>
+                                            <p className="text-xs font-black text-purple-600 uppercase tracking-wider">நிறுத்தம் {idx + 1}</p>
                                             <p className="font-bold text-slate-900">{order.consumer?.name || 'வாங்குபவர்'}</p>
                                             <p className="text-xs text-slate-500">{order.deliveryAddress}</p>
-                                            <p className="text-xs text-slate-400">#{order.id.slice(0, 8)} • {order.items?.length || 0} items</p>
+                                            <p className="text-xs text-slate-400">#{order.id.slice(0, 8)} • {order.items?.length || 0} பொருட்கள்</p>
                                         </div>
                                         <div className="text-right shrink-0">
                                             <p className="font-black text-slate-900">₹{order.totalAmount + order.deliveryCharge}</p>
@@ -1308,11 +1314,11 @@ function ClusterDeliveryTab({ orders, updateStatus, fetchOrders, currentFarmerId
                         <div key={pincode + '_out'} className="rounded-3xl border-2 border-emerald-200 bg-white overflow-hidden">
                             <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-5 py-4 flex items-center justify-between">
                                 <div className="text-white">
-                                    <p className="text-[10px] uppercase tracking-widest font-black opacity-80">Cluster — Out for Delivery</p>
+                                    <p className="text-[10px] uppercase tracking-widest font-black opacity-80">கிளஸ்டர் — வழங்கும் வழியில்</p>
                                     <p className="text-lg font-black flex items-center gap-2 mt-0.5">
-                                        <MapPin size={16} /> Pincode: {pincode}
+                                        <MapPin size={16} /> பின்கோடு: {pincode}
                                     </p>
-                                    <p className="text-xs opacity-80 mt-0.5">{clusterOrders.length} order{clusterOrders.length > 1 ? 's' : ''} • வழியில் உள்ளது</p>
+                                    <p className="text-xs opacity-80 mt-0.5">{clusterOrders.length} ஆர்டர் • வழியில் உள்ளது</p>
                                 </div>
                                 <button
                                     onClick={() => completeCluster(pincode, clusterOrders)}
@@ -1320,21 +1326,21 @@ function ClusterDeliveryTab({ orders, updateStatus, fetchOrders, currentFarmerId
                                     className="bg-white text-emerald-700 font-black text-xs uppercase tracking-wider px-4 py-2.5 rounded-xl hover:bg-emerald-50 transition-all disabled:opacity-60 flex items-center gap-2 shadow-lg"
                                 >
                                     <CheckCircle size={14} />
-                                    {delivering === pincode + '_done' ? 'Completing...' : 'Mark All Delivered'}
+                                    {delivering === pincode + '_done' ? 'முடிக்கிறது...' : 'அனைத்தையும் வழங்கியது என குறிக்க'}
                                 </button>
                             </div>
                             <div className="divide-y divide-slate-100">
                                 {clusterOrders.map((order, idx) => (
                                     <div key={order.id} className="px-5 py-4 flex items-start justify-between gap-4">
                                         <div className="space-y-1">
-                                            <p className="text-xs font-black text-emerald-600 uppercase tracking-wider">Stop {idx + 1}</p>
+                                            <p className="text-xs font-black text-emerald-600 uppercase tracking-wider">நிறுத்தம் {idx + 1}</p>
                                             <p className="font-bold text-slate-900">{order.consumer?.name || 'வாங்குபவர்'}</p>
                                             <p className="text-xs text-slate-500">{order.deliveryAddress}</p>
                                             <p className="text-xs text-slate-400">#{order.id.slice(0, 8)}</p>
                                         </div>
                                         <div className="text-right shrink-0">
                                             <p className="font-black text-slate-900">₹{order.totalAmount + order.deliveryCharge}</p>
-                                            <p className="text-xs text-emerald-500 font-bold">On the way</p>
+                                            <p className="text-xs text-emerald-500 font-bold">வழியில் உள்ளது</p>
                                         </div>
                                     </div>
                                 ))}
@@ -1349,8 +1355,8 @@ function ClusterDeliveryTab({ orders, updateStatus, fetchOrders, currentFarmerId
 
 function HandoffStepBadge({ step, role }: { step: number; role: 'A' | 'B' }) {
     const labels: Record<'A' | 'B', string[]> = {
-        A: ['⏳ Awaiting Accept', '🔒 Locked — Send Goods', '📦 Goods Sent — In Transit', '✅ Order Delivered'],
-        B: ['📩 New Request', '🔒 Accepted — Awaiting Goods', '📦 Goods Received — Dispatch Now', '✅ Order Delivered'],
+        A: ['⏳ ஏற்றதை காத்திருக்கிறது', '🔒 பூட்டப்பட்டது — பொருள் அனுப்பு', '📦 பொருள் அனுப்பப்பட்டது — பயணத்தில்', '✅ ஆர்டர் வழங்கப்பட்டது'],
+        B: ['📩 புதிய கோரிக்கை', '🔒 ஏற்றப்பட்டது — பொருளுக்காக காத்திருக்கிறது', '📦 பொருள் கிடைத்தது — இப்போது அனுப்பு', '✅ ஆர்டர் வழங்கப்பட்டது'],
     };
     const colors = [
         'bg-orange-100 text-orange-700',

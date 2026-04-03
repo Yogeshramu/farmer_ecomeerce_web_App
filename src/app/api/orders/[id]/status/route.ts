@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getSession } from '@/lib/auth';
-import { broadcastOrderUpdate, notifyConsumerOfStatusChange } from '@/lib/websocket-broadcast';
+import { broadcastOrderUpdate, notifyConsumerOfStatusChange, sendRefreshToUser } from '@/lib/websocket-broadcast';
 
 export async function PATCH(request: Request, props: { params: Promise<{ id: string }> }) {
     try {
@@ -26,15 +26,10 @@ export async function PATCH(request: Request, props: { params: Promise<{ id: str
             data: { status }
         });
 
-        // Broadcast real-time update to all subscribers
-        await broadcastOrderUpdate(id, {
-            status: updatedOrder.status,
-            updatedAt: updatedOrder.updatedAt,
-            message: `Order status updated to ${updatedOrder.status}`
-        });
-
-        // Notify consumer of the status change
-        await notifyConsumerOfStatusChange(updatedOrder.consumerId, id, status);
+        // Fire-and-forget: push REFRESH to consumer so their orders view updates instantly
+        notifyConsumerOfStatusChange(updatedOrder.consumerId, id, status);
+        sendRefreshToUser(updatedOrder.consumerId, 'orders');
+        sendRefreshToUser(updatedOrder.farmerId, 'orders');
 
         return NextResponse.json({ success: true, order: updatedOrder });
     } catch (error) {
