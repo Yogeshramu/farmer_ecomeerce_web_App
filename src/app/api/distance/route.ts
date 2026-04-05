@@ -16,7 +16,7 @@ export async function POST(request: Request) {
             consumerPincode,
             distanceKm: parseFloat(distance.toFixed(1)), // Keep one decimal place
             deliveryCharge: charge,
-            formula: 'Distance (km) × ₹10'
+            formula: '₹0 up to 5km, then ₹30 + ₹5 per km (beyond 5km)'
         });
     } catch (error) {
         console.error('Distance calculation error:', error);

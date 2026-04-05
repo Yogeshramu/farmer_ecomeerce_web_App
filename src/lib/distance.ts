@@ -16,8 +16,8 @@ function deg2rad(deg: number): number {
 }
 
 export function calculateDeliveryCharge(distance: number): number {
-    // ₹10 per km
-    return Math.round(distance * 10);
+    // Free for first 5km. After that: base fare + per-km charge.
+    return distance <= 5 ? 0 : Math.round(30 + (distance - 5) * 5);
 }
 
 export function getVehicleType(distance: number): "Bike" | "Van" {

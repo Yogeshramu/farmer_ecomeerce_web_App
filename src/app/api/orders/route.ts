@@ -66,7 +66,7 @@ export async function POST(request: Request) {
             const farmerItems = itemsByFarmer[farmerId];
             const farmer = farmerItems[0].crop.farmer;
 
-            // Calculate delivery charge based on pincodes (₹10/km)
+            // Calculate delivery charge: free up to 5km, then ₹30 + ₹5/km (beyond 5km)
             const farmerPincode = farmer.pincode || '600001'; // Default if not set
             const { charge } = await calculateDeliveryCharge(farmerPincode, deliveryPincode);
             

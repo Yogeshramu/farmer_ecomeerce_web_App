@@ -134,6 +134,7 @@ export async function calculateDeliveryCharge(farmerPincode: string, consumerPin
     const roadDistance = await getRoadDistance(farmerCoords.lat, farmerCoords.lng, consumerCoords.lat, consumerCoords.lng);
     const distanceKm = roadDistance ?? haversineDistance(farmerCoords.lat, farmerCoords.lng, consumerCoords.lat, consumerCoords.lng);
 
-    const charge = distanceKm <= 5 ? 0 : Math.round(30 + distanceKm * 5);
+    // Free for first 5km. After that: base fare + per-km charge.
+    const charge = distanceKm <= 5 ? 0 : Math.round(30 + (distanceKm - 5) * 5);
     return { charge, distance: distanceKm };
 }
