@@ -425,7 +425,7 @@ export default function FarmerDashboard() {
         { id: 'orders', label: 'ஆர்டர் மையம்', subtitle: 'நிலை & செயல்கள்', icon: Truck, badge: orders.filter((o) => o.status !== 'DELIVERED').length },
         { id: 'cluster', label: 'கிளஸ்டர் டெலிவரி', subtitle: 'பகுதி வழி திட்டம்', icon: Route, badge: (() => { const active = orders.filter(o => (o.status === 'ACCEPTED' || o.status === 'OUT_FOR_DELIVERY') && o.deliveryPincode); const pins = [...new Set(active.map(o => o.deliveryPincode))]; return pins.filter(p => active.filter(o => o.deliveryPincode === p).length >= 1).length; })() },
         { id: 'add', label: 'பயிர் சேர்க்க', subtitle: 'குரல் அல்லது படிவம்', icon: Sparkles },
-        { id: 'insights', label: 'குரல் ஆலோசனை', subtitle: 'விவசாய நுண்ணறிவு', icon: Mic },
+        // { id: 'insights', label: 'குரல் ஆலோசனை', subtitle: 'விவசாய நுண்ணறிவு', icon: Mic },
         { id: 'listings', label: 'நேரடி பட்டியல்', subtitle: 'சரக்கு பலகை', icon: Package, badge: allCrops.length },
         { id: 'inquiries', label: 'வாங்குபவர் பேசு', subtitle: 'விசாரணைகள்', icon: MessageSquare, badge: inquiries.length },
         { id: 'prices', label: 'விலை ரேடார்', subtitle: 'சந்தை போக்கு', icon: TrendingUp },
